@@ -1,0 +1,5 @@
+paths:
+  data_dir: "data/human_eval_repo"
+  dataset_file: "data/human_eval_repo/data/HumanEval.jsonl"
+  results_dir: "results/baseline"
+  repo_url: "https://github.com/openai/human-eval.git"

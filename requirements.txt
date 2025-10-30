@@ -1,0 +1,15 @@
+# Existing dependencies
+radon
+bandit
+pylint
+pandas
+numpy
+pyyaml
+tqdm
+gitpython
+cognitive_complexity
+
+# NEW: Web dashboard dependencies
+flask
+plotly
+pygments

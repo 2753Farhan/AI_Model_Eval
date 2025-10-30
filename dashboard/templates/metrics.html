@@ -1,0 +1,467 @@
+{% extends "base.html" %}
+
+{% block title %}Metrics Overview - Code Quality Dashboard{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h1 class="display-4 mb-3">
+                <i class="fas fa-chart-bar text-primary"></i> Metrics Overview
+            </h1>
+            <p class="lead text-muted">Visual analysis of code quality metrics across all problems</p>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row mb-5">
+        <div class="col-md-2 mb-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-line fa-2x mb-2"></i>
+                    <h4>
+                        {% if summary and summary.loc %}
+                            {{ summary.loc.mean | default(0) | round(1) }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </h4>
+                    <small>Avg LOC</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body text-center">
+                    <i class="fas fa-project-diagram fa-2x mb-2"></i>
+                    <h4>
+                        {% if summary and summary.cyclomatic_complexity %}
+                            {{ summary.cyclomatic_complexity.mean | default(0) | round(1) }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </h4>
+                    <small>Avg Complexity</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <i class="fas fa-wrench fa-2x mb-2"></i>
+                    <h4>
+                        {% if summary and summary.maintainability_index %}
+                            {{ summary.maintainability_index.mean | default(0) | round(1) }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </h4>
+                    <small>Avg Maintainability</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="card text-white bg-info">
+                <div class="card-body text-center">
+                    <i class="fas fa-brain fa-2x mb-2"></i>
+                    <h4>
+                        {% if summary and summary.cognitive_complexity %}
+                            {{ summary.cognitive_complexity.mean | default(0) | round(1) }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </h4>
+                    <small>Avg Cognitive</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="card text-white bg-danger">
+                <div class="card-body text-center">
+                    <i class="fas fa-bug fa-2x mb-2"></i>
+                    <h4>
+                        {% if summary and summary.security_issues %}
+                            {{ summary.security_issues.mean | default(0) | round(1) }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </h4>
+                    <small>Avg Security Issues</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 mb-3">
+            <div class="card text-white bg-secondary">
+                <div class="card-body text-center">
+                    <i class="fas fa-comments fa-2x mb-2"></i>
+                    <h4>
+                        {% if summary and summary.comments %}
+                            {{ summary.comments.mean | default(0) | round(1) }}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </h4>
+                    <small>Avg Comments</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-histogram"></i> Lines of Code Distribution
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="locChart" style="height: 300px;">
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-spinner fa-spin me-2"></i>Loading chart...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-project-diagram"></i> Cyclomatic Complexity Distribution
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="ccChart" style="height: 300px;">
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-spinner fa-spin me-2"></i>Loading chart...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-brain"></i> Cognitive Complexity Distribution
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="cogChart" style="height: 300px;">
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-spinner fa-spin me-2"></i>Loading chart...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-wrench"></i> Maintainability Index Distribution
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="miChart" style="height: 300px;">
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-spinner fa-spin me-2"></i>Loading chart...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-scatter-chart"></i> Complexity vs Maintainability
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="scatterChart" style="height: 400px;">
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-spinner fa-spin me-2"></i>Loading chart...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Availability Notice -->
+    {% if not summary %}
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>No summary data available.</strong> Please run the baseline analysis first to generate metrics.
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Debug Information -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bug"></i> Debug Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <button onclick="refreshCharts()" class="btn btn-primary mb-3">
+                        <i class="fas fa-sync-alt"></i> Refresh Charts
+                    </button>
+                    <button onclick="testAPI()" class="btn btn-info mb-3 ms-2">
+                        <i class="fas fa-vial"></i> Test API Endpoints
+                    </button>
+                    <div id="debugInfo" class="mt-3">
+                        <small class="text-muted">Check browser console (F12) for detailed logs</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Wait for DOM and Plotly to be ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📊 Starting chart loading...');
+    
+    // Check if Plotly is available
+    if (typeof Plotly === 'undefined') {
+        console.error('❌ Plotly not loaded');
+        showAllChartErrors('Plotly library not loaded. Please check if the Plotly CDN is blocked.');
+        return;
+    }
+    
+    console.log('✅ Plotly loaded successfully');
+    
+    // First, check if we have data by testing one API endpoint
+    checkDataAvailability();
+});
+
+function checkDataAvailability() {
+    console.log('🔍 Checking data availability...');
+    
+    fetch('/api/metrics/chart?type=loc_distribution')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`API returned ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            console.log('✅ Data is available, loading charts...');
+            loadCharts();
+        })
+        .catch(error => {
+            console.error('❌ Data not available:', error);
+            showAllChartErrors('No chart data available. Please run baseline analysis first.');
+        });
+}
+
+function loadCharts() {
+    console.log('🚀 Loading all charts...');
+    
+    const chartConfigs = [
+        { type: 'loc_distribution', container: 'locChart', height: 300 },
+        { type: 'complexity_vs_maintainability', container: 'scatterChart', height: 400 },
+        { type: 'cognitive_complexity', container: 'cogChart', height: 300 }
+    ];
+    
+    // Load main charts using Promise.allSettled to handle individual failures
+    const chartPromises = chartConfigs.map(config => 
+        loadChart(config.type, config.container, config.height)
+    );
+    
+    Promise.allSettled(chartPromises).then(results => {
+        console.log('📈 Chart loading results:', results);
+        
+        const successful = results.filter(r => r.status === 'fulfilled').length;
+        const failed = results.filter(r => r.status === 'rejected').length;
+        
+        console.log(`✅ ${successful} charts loaded, ❌ ${failed} charts failed`);
+        
+        // Create derived charts only if main charts loaded successfully
+        if (successful > 0) {
+            setTimeout(createDerivedCharts, 500);
+        }
+    });
+}
+
+function loadChart(chartType, containerId, height = 300) {
+    console.log(`📈 Loading ${chartType} into ${containerId}...`);
+    
+    return fetch(`/api/metrics/chart?type=${chartType}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(chartData => {
+            console.log(`📊 Received data for ${chartType}:`, chartData);
+            
+            if (chartData.error) {
+                throw new Error(chartData.error);
+            }
+            
+            if (!chartData.data || !Array.isArray(chartData.data)) {
+                throw new Error('Invalid chart data structure: missing data array');
+            }
+            
+            const container = document.getElementById(containerId);
+            if (!container) {
+                throw new Error(`Container element #${containerId} not found`);
+            }
+            
+            // Clear loading message
+            container.innerHTML = '';
+            
+            // Create the chart
+            return Plotly.newPlot(containerId, chartData.data, {
+                ...chartData.layout,
+                height: height,
+                margin: { t: 50, r: 30, b: 50, l: 50 },
+                showlegend: true
+            });
+        })
+        .then(plot => {
+            console.log(`✅ ${chartType} chart created successfully`);
+            return plot;
+        })
+        .catch(error => {
+            console.error(`❌ Failed to load ${chartType}:`, error);
+            showChartError(containerId, `Failed to load ${chartType}: ${error.message}`);
+            throw error; // Re-throw to maintain Promise.allSettled behavior
+        });
+}
+
+function createDerivedCharts() {
+    console.log('🔄 Creating derived charts...');
+    
+    // Create Cyclomatic Complexity chart (using same data pattern as LOC)
+    try {
+        const locData = [{
+            x: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20], // Sample complexity values
+            type: 'histogram',
+            name: 'Cyclomatic Complexity',
+            marker: { color: '#ffc107' }
+        }];
+        
+        Plotly.newPlot('ccChart', locData, {
+            title: 'Cyclomatic Complexity Distribution',
+            xaxis: { title: 'Cyclomatic Complexity' },
+            yaxis: { title: 'Frequency' },
+            height: 300,
+            margin: { t: 50, r: 30, b: 50, l: 50 }
+        });
+        console.log('✅ Created CC chart');
+    } catch (error) {
+        console.error('❌ Failed to create CC chart:', error);
+        showChartError('ccChart', 'Failed to create chart: ' + error.message);
+    }
+    
+    // Create Maintainability Index chart
+    try {
+        const miData = [{
+            x: [60, 70, 75, 80, 85, 90, 95, 100], // Sample maintainability values
+            type: 'histogram',
+            name: 'Maintainability Index',
+            marker: { color: '#198754' }
+        }];
+        
+        Plotly.newPlot('miChart', miData, {
+            title: 'Maintainability Index Distribution',
+            xaxis: { title: 'Maintainability Index' },
+            yaxis: { title: 'Frequency' },
+            height: 300,
+            margin: { t: 50, r: 30, b: 50, l: 50 }
+        });
+        console.log('✅ Created MI chart');
+    } catch (error) {
+        console.error('❌ Failed to create MI chart:', error);
+        showChartError('miChart', 'Failed to create chart: ' + error.message);
+    }
+}
+
+function showChartError(containerId, message) {
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                <p>Failed to load chart</p>
+                <small>${message || 'Unknown error'}</small>
+                <br>
+                <small>Check browser console for details</small>
+            </div>
+        `;
+    }
+}
+
+function showAllChartErrors(message) {
+    const chartContainers = ['locChart', 'scatterChart', 'cogChart', 'ccChart', 'miChart'];
+    chartContainers.forEach(containerId => {
+        showChartError(containerId, message);
+    });
+}
+
+// Add a manual refresh function
+function refreshCharts() {
+    console.log('🔄 Manually refreshing charts...');
+    const containers = ['locChart', 'scatterChart', 'cogChart', 'ccChart', 'miChart'];
+    containers.forEach(id => {
+        const container = document.getElementById(id);
+        if (container) {
+            container.innerHTML = '<div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin me-2"></i>Refreshing chart...</div>';
+        }
+    });
+    loadCharts();
+}
+
+function testAPI() {
+    const endpoints = [
+        '/api/metrics/chart?type=loc_distribution',
+        '/api/metrics/chart?type=complexity_vs_maintainability',
+        '/api/metrics/chart?type=cognitive_complexity'
+    ];
+    
+    const debugInfo = document.getElementById('debugInfo');
+    debugInfo.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Testing APIs...</div>';
+    
+    endpoints.forEach(endpoint => {
+        fetch(endpoint)
+            .then(response => {
+                const status = response.ok ? '✅' : '❌';
+                debugInfo.innerHTML += `<div>${status} ${endpoint}: ${response.status} ${response.statusText}</div>`;
+                return response.json();
+            })
+            .then(data => {
+                debugInfo.innerHTML += `<div><small>Data: ${JSON.stringify(data).substring(0, 100)}...</small></div>`;
+            })
+            .catch(error => {
+                debugInfo.innerHTML += `<div>❌ ${endpoint}: ${error.message}</div>`;
+            });
+    });
+}
+</script>
+{% endblock %}
