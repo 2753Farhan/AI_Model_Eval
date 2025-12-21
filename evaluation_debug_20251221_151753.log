@@ -1,0 +1,142 @@
+2025-12-21 15:17:53,342 - INFO - [__main__] - AI Model Evaluation Starting...
+2025-12-21 15:17:53,344 - INFO - [__main__] - STARTING: Configuration Initialization
+2025-12-21 15:17:53,349 - INFO - [__main__] - Initializing system components...
+2025-12-21 15:17:53,361 - INFO - [model_layer.model_integration] - ✅ Ollama client initialized
+2025-12-21 15:17:53,370 - INFO - [evaluation_layer.sandbox_executor] - Docker client initialized
+2025-12-21 15:17:53,370 - INFO - [__main__] - All components initialized successfully
+2025-12-21 15:17:53,371 - INFO - [__main__] - COMPLETED: Configuration Initialization in 0.03s
+2025-12-21 15:17:53,372 - INFO - [__main__] - Starting evaluation with test configuration...
+2025-12-21 15:17:53,372 - INFO - [__main__] - Starting AI Model Evaluation Pipeline with Enhanced Debugging
+2025-12-21 15:17:53,372 - INFO - [__main__] - ============================================================
+2025-12-21 15:17:53,373 - INFO - [__main__] - Configuration: 1 models, 2 samples per task
+2025-12-21 15:17:53,373 - INFO - [__main__] - STARTING: Dataset Loading
+2025-12-21 15:17:53,373 - INFO - [__main__] - Loading HumanEval dataset...
+2025-12-21 15:17:53,406 - INFO - [__main__] - Loaded 164 problems
+2025-12-21 15:17:53,406 - INFO - [__main__] - COMPLETED: Dataset Loading in 0.03s
+2025-12-21 15:17:53,407 - INFO - [__main__] - STARTING: Model Detection and Validation
+2025-12-21 15:17:53,407 - INFO - [__main__] - Checking model availability...
+2025-12-21 15:17:55,574 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 15:17:55,582 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:17:55,582 - INFO - [__main__] - Available models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:17:55,582 - INFO - [__main__] - Final model selection: ['codellama:7b']
+2025-12-21 15:17:55,583 - INFO - [__main__] - COMPLETED: Model Detection and Validation in 2.18s
+2025-12-21 15:17:55,583 - INFO - [__main__] - STARTING: Code Generation
+2025-12-21 15:17:55,583 - INFO - [__main__] - Generating code solutions...
+2025-12-21 15:17:55,599 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 15:17:55,601 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:18:11,130 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-12-21 15:18:11,650 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 15:18:11,652 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:18:28,201 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-12-21 15:18:28,714 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 15:18:28,715 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:19:51,910 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-12-21 15:19:52,419 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 15:19:52,421 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:20:26,155 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-12-21 15:20:26,671 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 15:20:26,674 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:20:32,214 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-12-21 15:20:32,730 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 15:20:32,732 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:20:39,808 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-12-21 15:20:40,343 - INFO - [__main__] - Generation results: 6 successful, 0 failed
+2025-12-21 15:20:40,343 - INFO - [__main__] - COMPLETED: Code Generation in 164.76s
+2025-12-21 15:20:40,365 - INFO - [__main__] - Saved solutions CSV to: results\generated_solutions.csv
+2025-12-21 15:20:40,366 - INFO - [__main__] - STARTING: Saving Individual Solution Files
+2025-12-21 15:20:40,368 - INFO - [__main__] - Creating directory structure in: results\individual_solutions
+2025-12-21 15:20:40,388 - INFO - [__main__] - Saved 12 individual files (0 errors)
+2025-12-21 15:20:40,389 - INFO - [__main__] - COMPLETED: Saving Individual Solution Files in 0.02s
+2025-12-21 15:20:40,389 - INFO - [__main__] - Individual solutions saved to: results\individual_solutions
+2025-12-21 15:20:40,389 - INFO - [__main__] - STARTING: Test Execution from Individual Files
+2025-12-21 15:20:40,390 - INFO - [__main__] - Executing tests from individual solution files...
+2025-12-21 15:20:40,460 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 15:20:40,460 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 15:20:40,466 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'has_close_elements' for test execution
+2025-12-21 15:20:40,474 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/0
+2025-12-21 15:21:03,129 - ERROR - [evaluation_layer.sandbox_executor] - Docker container error:   File "/tmp/test.py", line 2
+    AI Generated Solution
+       ^
+SyntaxError: invalid syntax
+
+2025-12-21 15:21:03,137 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 15:21:03,138 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 15:21:03,143 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'has_close_elements' for test execution
+2025-12-21 15:21:03,148 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/0
+2025-12-21 15:21:04,595 - ERROR - [evaluation_layer.sandbox_executor] - Docker container error:   File "/tmp/test.py", line 2
+    AI Generated Solution
+       ^
+SyntaxError: invalid syntax
+
+2025-12-21 15:21:04,601 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 15:21:04,602 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 15:21:04,604 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'separate_paren_groups' for test execution
+2025-12-21 15:21:04,609 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/1
+2025-12-21 15:21:06,286 - ERROR - [evaluation_layer.sandbox_executor] - Docker container error:   File "/tmp/test.py", line 2
+    AI Generated Solution
+       ^
+SyntaxError: invalid syntax
+
+2025-12-21 15:21:06,292 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 15:21:06,293 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 15:21:06,298 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'separate_paren_groups' for test execution
+2025-12-21 15:21:06,303 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/1
+2025-12-21 15:21:08,002 - ERROR - [evaluation_layer.sandbox_executor] - Docker container error:   File "/tmp/test.py", line 2
+    AI Generated Solution
+       ^
+SyntaxError: invalid syntax
+
+2025-12-21 15:21:08,006 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 15:21:08,007 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 15:21:08,010 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'truncate_number' for test execution
+2025-12-21 15:21:08,013 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/2
+2025-12-21 15:21:09,585 - ERROR - [evaluation_layer.sandbox_executor] - Docker container error:   File "/tmp/test.py", line 2
+    AI Generated Solution
+       ^
+SyntaxError: invalid syntax
+
+2025-12-21 15:21:09,589 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 15:21:09,589 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 15:21:09,591 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'truncate_number' for test execution
+2025-12-21 15:21:09,593 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/2
+2025-12-21 15:21:11,196 - ERROR - [evaluation_layer.sandbox_executor] - Docker container error:   File "/tmp/test.py", line 2
+    AI Generated Solution
+       ^
+SyntaxError: invalid syntax
+
+2025-12-21 15:21:11,199 - INFO - [__main__] - Execution sources: {'docker_error': 6}
+2025-12-21 15:21:11,199 - INFO - [__main__] - COMPLETED: Test Execution from Individual Files in 30.81s
+2025-12-21 15:21:11,200 - INFO - [__main__] - STARTING: Results Combination
+2025-12-21 15:21:11,336 - INFO - [__main__] - Combined 6 results
+2025-12-21 15:21:11,336 - INFO - [__main__] - COMPLETED: Results Combination in 0.14s
+2025-12-21 15:21:11,336 - INFO - [__main__] - STARTING: Metrics Calculation
+2025-12-21 15:21:11,336 - INFO - [__main__] - Calculating evaluation metrics...
+2025-12-21 15:21:11,381 - INFO - [__main__] - Metrics calculated successfully
+2025-12-21 15:21:11,381 - INFO - [__main__] - COMPLETED: Metrics Calculation in 0.05s
+2025-12-21 15:21:11,382 - INFO - [__main__] - STARTING: Results Persistence
+2025-12-21 15:21:11,388 - INFO - [__main__] - Results saved to:
+2025-12-21 15:21:11,390 - INFO - [__main__] -    Solutions: results\generated_solutions.csv
+2025-12-21 15:21:11,390 - INFO - [__main__] -    Individual Files: results\individual_solutions
+2025-12-21 15:21:11,390 - INFO - [__main__] -    Full Results: results\evaluation_results.csv
+2025-12-21 15:21:11,391 - INFO - [__main__] -    Comparison: results\model_comparison.csv
+2025-12-21 15:21:11,391 - INFO - [__main__] - COMPLETED: Results Persistence in 0.01s
+2025-12-21 15:21:11,391 - INFO - [__main__] - EVALUATION COMPLETE!
+2025-12-21 15:21:11,392 - INFO - [__main__] - ============================================================
+2025-12-21 15:21:11,393 - INFO - [__main__] - OVERALL STATISTICS:
+2025-12-21 15:21:11,393 - INFO - [__main__] -    Total Solutions: 6
+2025-12-21 15:21:11,393 - INFO - [__main__] -    Passed Solutions: 0
+2025-12-21 15:21:11,394 - INFO - [__main__] -    Overall Pass Rate: 0.0%
+2025-12-21 15:21:11,394 - INFO - [__main__] - FUNCTIONAL CORRECTNESS METRICS:
+2025-12-21 15:21:11,395 - INFO - [__main__] -    pass@1: 0.000
+2025-12-21 15:21:11,395 - INFO - [__main__] -    pass@5: 0.000
+2025-12-21 15:21:11,396 - INFO - [__main__] -    pass@10: 0.000
+2025-12-21 15:21:11,396 - INFO - [__main__] - 
+MODEL COMPARISON:
+2025-12-21 15:21:11,397 - INFO - [__main__] -    codellama:7b:
+2025-12-21 15:21:11,397 - INFO - [__main__] -      Pass Rate: 0.000
+2025-12-21 15:21:11,398 - INFO - [__main__] -      Pass@1: 0.000
+2025-12-21 15:21:11,398 - INFO - [__main__] -      Pass@5: 0.000
+2025-12-21 15:21:11,399 - INFO - [__main__] -      Total Tests: 6
+2025-12-21 15:21:11,409 - INFO - [__main__] - 
+Evaluation completed successfully!
+2025-12-21 15:21:11,410 - INFO - [__main__] - Start the dashboard with: python dashboard/app.py

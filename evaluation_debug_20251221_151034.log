@@ -1,0 +1,124 @@
+2025-12-21 15:10:34,736 - INFO - [__main__] - AI Model Evaluation Starting...
+2025-12-21 15:10:34,736 - INFO - [__main__] - STARTING: Configuration Initialization
+2025-12-21 15:10:34,738 - INFO - [__main__] - Initializing system components...
+2025-12-21 15:10:34,746 - INFO - [model_layer.model_integration] - ✅ Ollama client initialized
+2025-12-21 15:10:34,757 - INFO - [evaluation_layer.sandbox_executor] - Docker client initialized
+2025-12-21 15:10:34,758 - INFO - [__main__] - All components initialized successfully
+2025-12-21 15:10:34,758 - INFO - [__main__] - COMPLETED: Configuration Initialization in 0.02s
+2025-12-21 15:10:34,759 - INFO - [__main__] - Starting evaluation with test configuration...
+2025-12-21 15:10:34,760 - INFO - [__main__] - Starting AI Model Evaluation Pipeline with Enhanced Debugging
+2025-12-21 15:10:34,760 - INFO - [__main__] - ============================================================
+2025-12-21 15:10:34,760 - INFO - [__main__] - Configuration: 1 models, 2 samples per task
+2025-12-21 15:10:34,760 - INFO - [__main__] - STARTING: Dataset Loading
+2025-12-21 15:10:34,760 - INFO - [__main__] - Loading HumanEval dataset...
+2025-12-21 15:10:34,787 - INFO - [__main__] - Loaded 164 problems
+2025-12-21 15:10:34,787 - INFO - [__main__] - COMPLETED: Dataset Loading in 0.03s
+2025-12-21 15:10:34,787 - INFO - [__main__] - STARTING: Model Detection and Validation
+2025-12-21 15:10:34,788 - INFO - [__main__] - Checking model availability...
+2025-12-21 15:10:36,834 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 15:10:36,837 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:10:36,837 - INFO - [__main__] - Available models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:10:36,837 - INFO - [__main__] - Final model selection: ['codellama:7b']
+2025-12-21 15:10:36,838 - INFO - [__main__] - COMPLETED: Model Detection and Validation in 2.05s
+2025-12-21 15:10:36,838 - INFO - [__main__] - STARTING: Code Generation
+2025-12-21 15:10:36,838 - INFO - [__main__] - Generating code solutions...
+2025-12-21 15:10:36,848 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 15:10:36,850 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:11:06,736 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-12-21 15:11:07,350 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 15:11:07,372 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:11:25,517 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-12-21 15:11:26,107 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 15:11:26,109 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:11:44,661 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-12-21 15:11:45,170 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 15:11:45,172 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:12:58,023 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-12-21 15:12:58,583 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 15:12:58,583 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:13:06,643 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-12-21 15:13:07,152 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 15:13:07,154 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 15:13:15,351 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 200 OK"
+2025-12-21 15:13:16,176 - INFO - [__main__] - Generation results: 6 successful, 0 failed
+2025-12-21 15:13:16,179 - INFO - [__main__] - COMPLETED: Code Generation in 159.34s
+2025-12-21 15:13:16,352 - INFO - [__main__] - Saved solutions CSV to: results\generated_solutions.csv
+2025-12-21 15:13:16,354 - INFO - [__main__] - STARTING: Saving Individual Solution Files
+2025-12-21 15:13:16,356 - INFO - [__main__] - Creating directory structure in: results\individual_solutions
+2025-12-21 15:13:16,390 - INFO - [__main__] - Saved 12 individual files (0 errors)
+2025-12-21 15:13:16,390 - INFO - [__main__] - COMPLETED: Saving Individual Solution Files in 0.04s
+2025-12-21 15:13:16,391 - INFO - [__main__] - Individual solutions saved to: results\individual_solutions
+2025-12-21 15:13:16,391 - INFO - [__main__] - STARTING: Test Execution from Individual Files
+2025-12-21 15:13:16,391 - INFO - [__main__] - Executing tests from individual solution files...
+2025-12-21 15:13:16,469 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 15:13:16,469 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 15:13:16,488 - WARNING - [evaluation_layer.sandbox_executor] - Could not parse function name from code: invalid decimal literal (<unknown>, line 3)
+2025-12-21 15:13:16,489 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'has_close_elements' for test execution
+2025-12-21 15:13:16,520 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/0
+2025-12-21 15:13:16,533 - ERROR - [evaluation_layer.sandbox_executor] - Docker execution failed: run() got an unexpected keyword argument 'timeout'
+2025-12-21 15:13:16,563 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 15:13:16,564 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 15:13:16,566 - WARNING - [evaluation_layer.sandbox_executor] - Could not parse function name from code: invalid decimal literal (<unknown>, line 3)
+2025-12-21 15:13:16,567 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'has_close_elements' for test execution
+2025-12-21 15:13:16,570 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/0
+2025-12-21 15:13:16,571 - ERROR - [evaluation_layer.sandbox_executor] - Docker execution failed: run() got an unexpected keyword argument 'timeout'
+2025-12-21 15:13:16,634 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 15:13:16,635 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 15:13:16,636 - WARNING - [evaluation_layer.sandbox_executor] - Could not parse function name from code: invalid decimal literal (<unknown>, line 3)
+2025-12-21 15:13:16,637 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'separate_paren_groups' for test execution
+2025-12-21 15:13:16,638 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/1
+2025-12-21 15:13:16,638 - ERROR - [evaluation_layer.sandbox_executor] - Docker execution failed: run() got an unexpected keyword argument 'timeout'
+2025-12-21 15:13:16,681 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 15:13:16,682 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 15:13:16,685 - WARNING - [evaluation_layer.sandbox_executor] - Could not parse function name from code: invalid decimal literal (<unknown>, line 3)
+2025-12-21 15:13:16,687 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'separate_paren_groups' for test execution
+2025-12-21 15:13:16,689 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/1
+2025-12-21 15:13:16,690 - ERROR - [evaluation_layer.sandbox_executor] - Docker execution failed: run() got an unexpected keyword argument 'timeout'
+2025-12-21 15:13:16,780 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 15:13:16,780 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 15:13:16,784 - WARNING - [evaluation_layer.sandbox_executor] - Could not parse function name from code: invalid decimal literal (<unknown>, line 3)
+2025-12-21 15:13:16,784 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'truncate_number' for test execution
+2025-12-21 15:13:16,787 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/2
+2025-12-21 15:13:16,787 - ERROR - [evaluation_layer.sandbox_executor] - Docker execution failed: run() got an unexpected keyword argument 'timeout'
+2025-12-21 15:13:16,834 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 15:13:16,834 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 15:13:16,836 - WARNING - [evaluation_layer.sandbox_executor] - Could not parse function name from code: invalid decimal literal (<unknown>, line 3)
+2025-12-21 15:13:16,836 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'truncate_number' for test execution
+2025-12-21 15:13:16,841 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/2
+2025-12-21 15:13:16,842 - ERROR - [evaluation_layer.sandbox_executor] - Docker execution failed: run() got an unexpected keyword argument 'timeout'
+2025-12-21 15:13:16,846 - INFO - [__main__] - Execution sources: {'docker_error': 6}
+2025-12-21 15:13:16,847 - INFO - [__main__] - COMPLETED: Test Execution from Individual Files in 0.46s
+2025-12-21 15:13:16,847 - INFO - [__main__] - STARTING: Results Combination
+2025-12-21 15:13:16,948 - INFO - [__main__] - Combined 6 results
+2025-12-21 15:13:16,949 - INFO - [__main__] - COMPLETED: Results Combination in 0.10s
+2025-12-21 15:13:16,950 - INFO - [__main__] - STARTING: Metrics Calculation
+2025-12-21 15:13:16,950 - INFO - [__main__] - Calculating evaluation metrics...
+2025-12-21 15:13:17,003 - INFO - [__main__] - Metrics calculated successfully
+2025-12-21 15:13:17,004 - INFO - [__main__] - COMPLETED: Metrics Calculation in 0.05s
+2025-12-21 15:13:17,004 - INFO - [__main__] - STARTING: Results Persistence
+2025-12-21 15:13:17,017 - INFO - [__main__] - Results saved to:
+2025-12-21 15:13:17,018 - INFO - [__main__] -    Solutions: results\generated_solutions.csv
+2025-12-21 15:13:17,019 - INFO - [__main__] -    Individual Files: results\individual_solutions
+2025-12-21 15:13:17,019 - INFO - [__main__] -    Full Results: results\evaluation_results.csv
+2025-12-21 15:13:17,020 - INFO - [__main__] -    Comparison: results\model_comparison.csv
+2025-12-21 15:13:17,020 - INFO - [__main__] - COMPLETED: Results Persistence in 0.02s
+2025-12-21 15:13:17,020 - INFO - [__main__] - EVALUATION COMPLETE!
+2025-12-21 15:13:17,021 - INFO - [__main__] - ============================================================
+2025-12-21 15:13:17,021 - INFO - [__main__] - OVERALL STATISTICS:
+2025-12-21 15:13:17,022 - INFO - [__main__] -    Total Solutions: 6
+2025-12-21 15:13:17,022 - INFO - [__main__] -    Passed Solutions: 0
+2025-12-21 15:13:17,023 - INFO - [__main__] -    Overall Pass Rate: 0.0%
+2025-12-21 15:13:17,024 - INFO - [__main__] - FUNCTIONAL CORRECTNESS METRICS:
+2025-12-21 15:13:17,024 - INFO - [__main__] -    pass@1: 0.000
+2025-12-21 15:13:17,024 - INFO - [__main__] -    pass@5: 0.000
+2025-12-21 15:13:17,025 - INFO - [__main__] -    pass@10: 0.000
+2025-12-21 15:13:17,025 - INFO - [__main__] - 
+MODEL COMPARISON:
+2025-12-21 15:13:17,027 - INFO - [__main__] -    codellama:7b:
+2025-12-21 15:13:17,027 - INFO - [__main__] -      Pass Rate: 0.000
+2025-12-21 15:13:17,028 - INFO - [__main__] -      Pass@1: 0.000
+2025-12-21 15:13:17,028 - INFO - [__main__] -      Pass@5: 0.000
+2025-12-21 15:13:17,028 - INFO - [__main__] -      Total Tests: 6
+2025-12-21 15:13:17,064 - INFO - [__main__] - 
+Evaluation completed successfully!
+2025-12-21 15:13:17,064 - INFO - [__main__] - Start the dashboard with: python dashboard/app.py

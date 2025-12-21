@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluation Results - AI ModelEval</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Highlight.js for code syntax -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+    <style>
+        .code-block {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .test-result {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+        }
+        .test-pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .test-fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-error {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .problem-card {
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        .problem-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-robot"></i> AI ModelEval
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/model_comparison">
+                            <i class="fas fa-chart-bar"></i> Model Comparison
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/evaluation_results">
+                            <i class="fas fa-list"></i> Evaluation Results
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1 class="display-4">
+                    <i class="fas fa-list text-primary"></i> Evaluation Results
+                </h1>
+                <p class="lead text-muted">
+                    Detailed view of all AI model evaluation results
+                    {% if model_filter %}
+                    <span class="badge bg-info">Filtered by: {{ model_filter }}</span>
+                    {% endif %}
+                </p>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+                        <li class="breadcrumb-item active">Evaluation Results</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Filter Controls -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-filter"></i> Filter and Search
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Filter by Model:</label>
+                                <select id="modelFilter" class="form-select" onchange="filterByModel()">
+                                    <option value="">All Models</option>
+                                    {% if results %}
+                                        {% set unique_models = results|map(attribute='model')|unique|list %}
+                                        {% for model in unique_models|sort %}
+                                        <option value="{{ model }}" 
+                                                {% if model_filter == model %}selected{% endif %}>
+                                            {{ model }}
+                                        </option>
+                                        {% endfor %}
+                                    {% endif %}
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Filter by Status:</label>
+                                <select id="statusFilter" class="form-select" onchange="filterByStatus()">
+                                    <option value="">All Results</option>
+                                    <option value="passed">Passed Only</option>
+                                    <option value="failed">Failed Only</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Search:</label>
+                                <div class="input-group">
+                                    <input type="text" id="searchInput" class="form-control" 
+                                           placeholder="Search task ID or model...">
+                                    <button class="btn btn-primary" onclick="searchResults()">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Summary -->
+        {% if results %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-pie"></i> Results Summary
+                            <span class="badge bg-info ms-2">{{ results|length }} Results</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title">Passed Tests</h6>
+                                        <h3>
+                                            {% set passed_count = results|selectattr('passed')|list|length %}
+                                            {{ passed_count }}
+                                        </h3>
+                                        <small>{{ (passed_count / results|length * 100)|round(1) }}% Success</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-danger text-white">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title">Failed Tests</h6>
+                                        <h3>
+                                            {% set failed_count = results|length - passed_count %}
+                                            {{ failed_count }}
+                                        </h3>
+                                        <small>{{ (failed_count / results|length * 100)|round(1) }}% Failure</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title">Unique Models</h6>
+                                        <h3>
+                                            {% set unique_models = results|map(attribute='model')|unique|list|length %}
+                                            {{ unique_models }}
+                                        </h3>
+                                        <small>Different AI models</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-warning text-white">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title">Unique Problems</h6>
+                                        <h3>
+                                            {% set unique_problems = results|map(attribute='task_id')|unique|list|length %}
+                                            {{ unique_problems }}
+                                        </h3>
+                                        <small>Different HumanEval problems</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Table -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-table"></i> Detailed Results
+                            <small class="text-muted">Click any row to view details</small>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="resultsTable">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Task ID</th>
+                                        <th>Model</th>
+                                        <th>Strategy</th>
+                                        <th>Sample</th>
+                                        <th>Status</th>
+                                        <th>Result</th>
+                                        <th>Execution Source</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for result in results %}
+                                    <tr class="problem-card" onclick="showResultDetails('{{ result.task_id }}', '{{ result.model }}', {{ result.sample_id }})">
+                                        <td>
+                                            <code>{{ result.task_id }}</code>
+                                        </td>
+                                        <td>
+                                            <strong>{{ result.model }}</strong>
+                                        </td>
+                                        <td>{{ result.strategy }}</td>
+                                        <td>#{{ result.sample_id }}</td>
+                                        <td>
+                                            {% if result.passed %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check"></i> Passed
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-danger">
+                                                    <i class="fas fa-times"></i> Failed
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <small>{{ result.result|truncate(50) }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ result.get('source', 'unknown') }}</span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary" 
+                                                    onclick="event.stopPropagation(); showResultDetails('{{ result.task_id }}', '{{ result.model }}', {{ result.sample_id }})">
+                                                <i class="fas fa-eye"></i> View
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- No Results Message -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-clipboard-list fa-4x text-muted mb-3"></i>
+                        <h4>No Evaluation Results Available</h4>
+                        <p class="text-muted mb-4">
+                            Run the AI model evaluation first to generate results.
+                        </p>
+                        <a href="/" class="btn btn-primary">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Results Details Modal -->
+        <div class="modal fade" id="resultDetailsModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalTitle">Result Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="modalBody">
+                        <!-- Dynamic content will be loaded here -->
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" onclick="copyResultDetails()">
+                            <i class="fas fa-copy"></i> Copy Details
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Section -->
+        {% if results %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-download"></i> Export Options
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Export the evaluation results for further analysis.</p>
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <button class="btn btn-success w-100" onclick="exportResultsCSV()">
+                                    <i class="fas fa-file-csv"></i> Export as CSV
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <button class="btn btn-primary w-100" onclick="exportResultsJSON()">
+                                    <i class="fas fa-file-code"></i> Export as JSON
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <button class="btn btn-warning w-100" onclick="printResults()">
+                                    <i class="fas fa-print"></i> Print Results
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <a href="/model_comparison" class="btn btn-info w-100">
+                                    <i class="fas fa-chart-bar"></i> View Comparison
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light mt-5 py-4">
+        <div class="container text-center">
+            <p class="mb-0">AI ModelEval - Evaluation Results Dashboard</p>
+            <small>Showing {{ results|length if results else 0 }} evaluation results</small>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    

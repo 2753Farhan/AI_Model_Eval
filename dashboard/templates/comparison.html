@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Solution Comparison - CodeQualBench{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-5">
+                <i class="fas fa-code-compare text-primary"></i> Solution Comparison
+            </h1>
+            <p class="lead text-muted">Comparing canonical solution with AI-generated alternatives for: <strong>{{ problem_id }}</strong></p>
+        </div>
+    </div>
+
+    <!-- Problem Info -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle"></i> Problem Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Problem ID:</strong> {{ problem_id }}<br>
+                            <strong>Function Name:</strong> {{ function_name }}<br>
+                            <strong>Total AI Solutions:</strong> {{ ai_solutions|length }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Prompt Preview:</strong><br>
+                            <code class="text-muted">{{ prompt_preview }}</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Solutions Comparison -->
+    <div class="row">
+        <!-- Canonical Solution -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-user-check"></i> Canonical Solution (Human)
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="p-3 border-bottom">
+                        <small class="text-muted">This is the original human-written solution from HumanEval</small>
+                    </div>
+                    <pre class="m-0 p-3"><code class="language-python">{{ canonical_solution }}</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Solutions -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-robot"></i> AI-Generated Solutions
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if ai_solutions %}
+                    <!-- Solution Tabs -->
+                    <ul class="nav nav-tabs" id="aiSolutionTabs" role="tablist">
+                        {% for solution in ai_solutions %}
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link {% if loop.first %}active{% endif %}" 
+                                    id="tab-{{ solution.model }}-{{ solution.sample_id }}" 
+                                    data-bs-toggle="tab" 
+                                    data-bs-target="#content-{{ solution.model }}-{{ solution.sample_id }}" 
+                                    type="button" role="tab">
+                                {{ solution.model }} #{{ solution.sample_id }}
+                                {% if solution.passed %}
+                                    <span class="badge bg-success ms-1">Pass</span>
+                                {% else %}
+                                    <span class="badge bg-danger ms-1">Fail</span>
+                                {% endif %}
+                            </button>
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                    <!-- Solution Content -->
+                    <div class="tab-content p-3" id="aiSolutionContent">
+                        {% for solution in ai_solutions %}
+                        <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
+                             id="content-{{ solution.model }}-{{ solution.sample_id }}" 
+                             role="tabpanel">
+                            
+                            <!-- Solution Header -->
+                            <div class="mb-3">
+                                <h6>Model: {{ solution.model }}</h6>
+                                <small class="text-muted">
+                                    Strategy: {{ solution.strategy }} | 
+                                    Sample: {{ solution.sample_id }} |
+                                    {% if solution.passed %}
+                                        <span class="text-success">✅ Tests Passed</span>
+                                    {% else %}
+                                        <span class="text-danger">❌ Tests Failed</span>
+                                    {% endif %}
+                                </small>
+                            </div>
+
+                            <!-- Generated Code -->
+                            <h6>Generated Code:</h6>
+                            <pre><code class="language-python">{{ solution.generated_code }}</code></pre>
+
+                            <!-- Test Results -->
+                            {% if not solution.passed and solution.output %}
+                            <h6 class="mt-3">Test Output:</h6>
+                            <div class="alert alert-warning small">
+                                <pre class="mb-0"><code>{{ solution.output }}</code></pre>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="p-3 text-center text-muted">
+                        <i class="fas fa-robot fa-2x mb-2"></i>
+                        <p>No AI solutions available for this problem.</p>
+                        <small>Run the evaluation first to generate AI solutions.</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Cases -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-vial"></i> Test Cases
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <pre><code class="language-python">{{ test_cases }}</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <a href="/" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left"></i> Back to Problems List
+            </a>
+            <a href="/problem/{{ problem_id.split('/')[1] }}" class="btn btn-outline-secondary">
+                <i class="fas fa-chart-bar"></i> View Detailed Metrics
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Initialize syntax highlighting
+if (typeof hljs !== 'undefined') {
+    hljs.highlightAll();
+}
+
+// Add copy functionality to code blocks
+document.querySelectorAll('pre code').forEach((block) => {
+    const pre = block.parentElement;
+    if (pre && !pre.querySelector('.copy-btn')) {
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'btn btn-sm btn-outline-secondary copy-btn';
+        copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+        copyBtn.style.position = 'absolute';
+        copyBtn.style.top = '10px';
+        copyBtn.style.right = '10px';
+        copyBtn.style.opacity = '0.7';
+        
+        copyBtn.addEventListener('click', function() {
+            navigator.clipboard.writeText(block.textContent).then(() => {
+                this.innerHTML = '<i class="fas fa-check"></i>';
+                this.classList.remove('btn-outline-secondary');
+                this.classList.add('btn-success');
+                setTimeout(() => {
+                    this.innerHTML = '<i class="fas fa-copy"></i>';
+                    this.classList.remove('btn-success');
+                    this.classList.add('btn-outline-secondary');
+                }, 2000);
+            });
+        });
+        
+        pre.style.position = 'relative';
+        pre.appendChild(copyBtn);
+    }
+});
+</script>
+{% endblock %}

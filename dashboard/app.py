@@ -1,3 +1,4 @@
+from venv import logger
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
 import json
@@ -9,24 +10,31 @@ import plotly.utils
 
 app = Flask(__name__)
 
+
+
+
 class DashboardDataManager:
     def __init__(self):
         self.base_dir = Path(__file__).parent.parent
         self.metrics_df = None
         self.samples_data = None
+        self.evaluation_results = None
         self.load_data()
     
     def load_data(self):
-        """Load metrics and original dataset."""
+        """Load all data for enhanced dashboard"""
         try:
-            # Load metrics CSV
-            metrics_path = self.base_dir / "results" / "baseline" / "human_baseline_metrics.csv"
+            # Load baseline metrics
+            metrics_path = self.base_dir / "results" / "human_baseline_metrics.csv"
             if metrics_path.exists():
                 self.metrics_df = pd.read_csv(metrics_path)
-                print(f"✅ Loaded metrics for {len(self.metrics_df)} problems")
-            else:
-                print("❌ Metrics file not found. Run baseline_analysis.py first.")
-                return False
+                print(f"✅ Loaded baseline metrics for {len(self.metrics_df)} problems")
+            
+            # Load evaluation results
+            results_path = self.base_dir / "results" / "evaluation_results.csv"
+            if results_path.exists():
+                self.evaluation_results = pd.read_csv(results_path)
+                print(f"✅ Loaded evaluation results for {len(self.evaluation_results)} samples")
             
             # Load original dataset
             dataset_path = self.base_dir / "data" / "human_eval_repo" / "data" / "HumanEval.jsonl.gz"
@@ -36,10 +44,7 @@ class DashboardDataManager:
                     for line in f:
                         self.samples_data.append(json.loads(line))
                 print(f"✅ Loaded {len(self.samples_data)} original problems")
-            else:
-                print("❌ Dataset not found.")
-                return False
-                
+            
             return True
             
         except Exception as e:
@@ -357,6 +362,43 @@ def debug():
         'sample_problem_ids': [p['problem_id'] for p in problems[:3]] if problems else []
     })
 
+
+@app.route('/comparison/<int:problem_number>')
+def comparison(problem_number):
+    """Show side-by-side comparison of canonical and AI solutions"""
+    try:
+        # Get canonical solution
+        problem_id = f"HumanEval/{problem_number}"
+        canonical_data = data_manager.get_problem_details(problem_id)
+        if not canonical_data:
+            return f"Problem {problem_id} not found", 404
+        
+        # Get AI solutions for this problem
+        if data_manager.evaluation_results is not None:
+            ai_solutions = data_manager.evaluation_results[
+                data_manager.evaluation_results['task_id'] == problem_id
+            ].to_dict('records')
+        else:
+            ai_solutions = []
+        
+        # Extract function name from prompt
+        prompt = canonical_data.get('prompt', '')
+        function_name = "Unknown"
+        if 'def ' in prompt:
+            function_name = prompt.split('def ')[1].split('(')[0].strip()
+        
+        return render_template('comparison.html',
+                            problem_id=problem_id,
+                            function_name=function_name,
+                            prompt_preview=prompt[:100] + '...' if len(prompt) > 100 else prompt,
+                            canonical_solution=canonical_data.get('canonical_solution', ''),
+                            ai_solutions=ai_solutions,
+                            test_cases=canonical_data.get('test', ''))
+        
+    except Exception as e:
+        logger.error(f"Error loading comparison for {problem_id}: {e}")
+        return f"Error loading comparison: {e}", 500
+
 if __name__ == '__main__':
     if data_manager.load_data():
         print("🚀 Starting Code Quality Dashboard...")
@@ -365,3 +407,7 @@ if __name__ == '__main__':
         app.run(debug=True, host='0.0.0.0', port=5000)
     else:
         print("❌ Failed to load data. Please run baseline_analysis.py first.")
+
+
+
+

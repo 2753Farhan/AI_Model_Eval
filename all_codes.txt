@@ -6,11 +6,1028 @@ Excluded Folders: ['venv']
 
 
 ================================================================================
+FILE: ai_model_eval.py
+PATH: ai_model_eval.py
+================================================================================
+
+#!/usr/bin/env python3
+"""
+AI_ModelEval - Main execution script for evaluating AI code generation models
+Enhanced with layer-by-layer debugging and individual solution files
+ASCII-only logging for Windows compatibility
+"""
+
+import os
+import sys
+import pandas as pd
+import logging
+import traceback
+from pathlib import Path
+import time
+from datetime import datetime
+
+# Add src to path
+sys.path.append(str(Path(__file__).parent / 'src'))
+
+from data_layer.config_manager import ConfigManager
+from data_layer.dataset_loader import HumanEvalLoader
+from analysis_layer.static_analysis import analyze_dataset
+from model_layer.model_integration import ModelManager
+from model_layer.prompt_engine import PromptEngine
+from model_layer.code_generator import CodeGenerator
+from evaluation_layer.sandbox_executor import SandboxExecutor
+from evaluation_layer.metrics_calculator import MetricsCalculator
+
+# Setup ASCII-only logging for Windows compatibility
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s - %(levelname)s - [%(name)s] - %(message)s',
+    handlers=[
+        logging.FileHandler(f"evaluation_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log", encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+class DebugTimer:
+    """Utility class for timing and debugging each layer"""
+    def __init__(self, operation_name: str):
+        self.operation_name = operation_name
+        self.start_time = time.time()
+        logger.info(f"STARTING: {operation_name}")
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        elapsed = time.time() - self.start_time
+        if exc_type:
+            logger.error(f"FAILED: {self.operation_name} after {elapsed:.2f}s - {exc_val}")
+            logger.debug(f"Stack trace: {traceback.format_exc()}")
+        else:
+            logger.info(f"COMPLETED: {self.operation_name} in {elapsed:.2f}s")
+
+class AIModelEval:
+    def __init__(self, config_path: str = "config/settings.yaml"):
+        with DebugTimer("Configuration Initialization"):
+            self.config = ConfigManager(config_path)
+            self.config.ensure_dirs()
+            
+            # Initialize components with debugging
+            logger.info("Initializing system components...")
+            self.model_manager = ModelManager(self.config)
+            self.prompt_engine = PromptEngine()
+            self.code_generator = CodeGenerator(self.model_manager, self.prompt_engine)
+            self.sandbox = SandboxExecutor(timeout=self.config.get("evaluation.timeout_seconds", 30))
+            self.metrics_calc = MetricsCalculator()
+            logger.info("All components initialized successfully")
+    
+    def save_individual_solution_files(self, solutions_df: pd.DataFrame, base_dir: Path):
+        """Save each solution as a separate Python file with organized directory structure"""
+        with DebugTimer("Saving Individual Solution Files"):
+            solutions_dir = base_dir / "individual_solutions"
+            solutions_dir.mkdir(exist_ok=True)
+        
+            logger.info(f"Creating directory structure in: {solutions_dir}")
+            files_created = 0
+            errors = 0
+        
+            for idx, solution in solutions_df.iterrows():
+                try:
+                    if solution.get('error'):
+                        logger.warning(f"Skipping solution with generation error: {solution['task_id']}")
+                        continue
+                
+                # Create directory structure
+                    model_clean = solution['model'].replace(':', '_').replace('/', '_')
+                    strategy_clean = solution['strategy'].replace(':', '_').replace('/', '_')
+                    task_clean = solution['task_id'].replace('/', '_')
+                
+                    model_dir = solutions_dir / model_clean
+                    strategy_dir = model_dir / strategy_clean
+                    task_dir = strategy_dir / task_clean
+                    task_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Clean the generated code - remove [PYTHON] tags and extract actual code
+                    generated_code = solution['generated_code']
+                
+                # Remove [PYTHON] tags if present
+                    if '[PYTHON]' in generated_code and '[/PYTHON]' in generated_code:
+                        # Extract code between [PYTHON] tags
+                        start_idx = generated_code.find('[PYTHON]') + len('[PYTHON]')
+                        end_idx = generated_code.find('[/PYTHON]')
+                        generated_code = generated_code[start_idx:end_idx].strip()
+                    elif '```python' in generated_code and '```' in generated_code:
+                        # Extract code between ```python blocks
+                        start_idx = generated_code.find('```python') + len('```python')
+                        end_idx = generated_code.find('```', start_idx)
+                        generated_code = generated_code[start_idx:end_idx].strip()
+                    elif '```' in generated_code:
+                        # Extract code between ``` blocks
+                        start_idx = generated_code.find('```') + len('```')
+                        end_idx = generated_code.find('```', start_idx)
+                        generated_code = generated_code[start_idx:end_idx].strip()
+                
+                    # Create solution file
+                    filename = task_dir / f"sample_{solution['sample_id']}.py"
+                
+                    # Write the solution with metadata header
+                    with open(filename, 'w', encoding='utf-8') as f:
+                        f.write(f'"""\n')
+                        f.write(f'AI Generated Solution\n')
+                        f.write(f'Task ID: {solution["task_id"]}\n')
+                        f.write(f'Model: {solution["model"]}\n')
+                        f.write(f'Strategy: {solution["strategy"]}\n')
+                        f.write(f'Sample ID: {solution["sample_id"]}\n')
+                        f.write(f'Generated: {datetime.now().isoformat()}\n')
+                        f.write(f'"""\n\n')
+                        f.write(generated_code)
+                
+                # Create test file for this solution
+                    test_filename = task_dir / f"test_sample_{solution['sample_id']}.py"
+                    with open(test_filename, 'w', encoding='utf-8') as f:
+                        f.write(f'"""\n')
+                        f.write(f'Test for AI Generated Solution\n')
+                        f.write(f'Task ID: {solution["task_id"]}\n')
+                        f.write(f'Model: {solution["model"]}\n')
+                        f.write(f'"""\n\n')
+                        f.write(generated_code)
+                        f.write('\n\n')
+                        f.write(solution['tests'])
+                
+                    files_created += 2
+                    if files_created % 10 == 0:
+                        logger.debug(f"Created {files_created} files so far...")
+                    
+                except Exception as e:
+                    errors += 1
+                    logger.error(f"Failed to save solution file for {solution['task_id']}: {e}")
+                    logger.debug(f"Solution data: {solution.get('generated_code', 'NO_CODE')[:100]}...")
+        
+            logger.info(f"Saved {files_created} individual files ({errors} errors)")
+            return solutions_dir    
+
+
+    def debug_model_detection(self, models: list) -> list:
+        """Debug model availability with detailed logging"""
+        with DebugTimer("Model Detection and Validation"):
+            logger.info("Checking model availability...")
+            
+            available_models = self.model_manager.get_available_models()
+            logger.info(f"Available models: {available_models}")
+            
+            if not available_models:
+                logger.warning("No models detected via API")
+                logger.info("Attempting fallback to common models...")
+                models_to_use = ["codellama:7b"]
+                logger.info(f"Will attempt to use: {models_to_use}")
+            else:
+                # Use only available models
+                models_to_use = [m for m in models if m in available_models]
+                if not models_to_use:
+                    logger.error("No available models found from requested list!")
+                    logger.info(f"Requested: {models}, Available: {available_models}")
+                    logger.info("Try pulling a model first: ollama pull codellama:7b")
+                    return []
+            
+            logger.info(f"Final model selection: {models_to_use}")
+            return models_to_use
+    
+    def debug_data_loading(self):
+        """Debug data loading process"""
+        with DebugTimer("Dataset Loading"):
+            logger.info("Loading HumanEval dataset...")
+            loader = HumanEvalLoader(
+                self.config.get("paths.repo_url"),
+                self.config.get("paths.data_dir")
+            )
+            
+            logger.debug("Fetching repository...")
+            loader.fetch_repo()
+            
+            logger.debug("Loading problems from dataset...")
+            problems = loader.load_dataset()
+            
+            logger.info(f"Loaded {len(problems)} problems")
+            if problems:
+                logger.debug(f"Sample problem IDs: {[p['task_id'] for p in problems[:3]]}")
+            
+            return problems
+    
+    def debug_code_generation(self, problems: list, models_to_use: list, num_samples: int):
+        """Debug code generation with detailed progress tracking"""
+        with DebugTimer("Code Generation"):
+            logger.info("Generating code solutions...")
+            logger.debug(f"Generating {num_samples} samples each for {len(problems)} problems using {len(models_to_use)} models")
+            
+            # Use a small subset for testing
+            test_problems = problems[:3]  # Reduced from 5 to 3 for faster testing
+            
+            solutions_df = self.code_generator.generate_solutions(
+                test_problems,
+                models_to_use,
+                num_samples=num_samples,
+                strategies=["zero_shot"]
+            )
+            
+            # Analyze generation results
+            total_solutions = len(solutions_df)
+            if 'error' in solutions_df.columns:
+                successful_solutions = len(solutions_df[solutions_df['error'].isna()])
+            else:
+                successful_solutions = total_solutions
+            failed_solutions = total_solutions - successful_solutions
+            
+            logger.info(f"Generation results: {successful_solutions} successful, {failed_solutions} failed")
+            
+            if failed_solutions > 0:
+                logger.warning(f"{failed_solutions} solutions failed generation")
+                if 'error' in solutions_df.columns:
+                    failed_samples = solutions_df[solutions_df['error'].notna()]
+                    for _, failed in failed_samples.head(3).iterrows():
+                        logger.debug(f"Failed sample: {failed['task_id']} - {failed.get('error', 'Unknown error')}")
+            
+            return solutions_df
+    
+    """Debug test execution using individual solution files"""
+    def debug_test_execution(self, solutions_df: pd.DataFrame):
+        with DebugTimer("Test Execution from Individual Files"):
+            logger.info("Executing tests from individual solution files...")
+            execution_results = []
+            total_tests = len(solutions_df)
+            
+            for idx, solution in solutions_df.iterrows():
+                try:
+                    logger.debug(f"Testing solution {idx+1}/{total_tests}: {solution['task_id']} - {solution['model']}")
+                    
+                    if solution.get('error'):
+                        logger.warning(f"Skipping execution for solution with generation error")
+                        execution_results.append({
+                            'task_id': solution['task_id'],
+                            'model': solution['model'],
+                            'strategy': solution['strategy'],
+                            'sample_id': solution['sample_id'],
+                            'passed': False,
+                            'result': 'generation_error',
+                            'output': solution.get('error', 'Unknown error'),
+                            'source': 'dataframe'  # Mark source
+                        })
+                        continue
+                    
+                    # Get the individual solution file path
+                    model_clean = solution['model'].replace(':', '_').replace('/', '_')
+                    strategy_clean = solution['strategy'].replace(':', '_').replace('/', '_')
+                    task_clean = solution['task_id'].replace('/', '_')
+                    
+                    solution_file = (Path(self.config.get("paths.results_dir")) / 
+                                   "individual_solutions" / model_clean / strategy_clean / 
+                                   task_clean / f"sample_{solution['sample_id']}.py")
+                    
+                    if not solution_file.exists():
+                        logger.warning(f"Solution file not found: {solution_file}")
+                        execution_results.append({
+                            'task_id': solution['task_id'],
+                            'model': solution['model'],
+                            'strategy': solution['strategy'],
+                            'sample_id': solution['sample_id'],
+                            'passed': False,
+                            'result': 'file_not_found',
+                            'output': f'Solution file not found: {solution_file}',
+                            'source': 'dataframe'
+                        })
+                        continue
+                    
+                    # Read the actual code from the individual file
+                    logger.debug(f"Reading solution from: {solution_file}")
+                    with open(solution_file, 'r', encoding='utf-8') as f:
+                        file_content = f.read()
+                    
+                    # Extract just the function code (skip metadata header)
+                    lines = file_content.split('\n')
+                    code_lines = []
+                    in_code_section = False
+                    
+                    for line in lines:
+                        # Start capturing after the header (triple quotes)
+                        if line.strip().startswith('"""') and not in_code_section:
+                            in_code_section = True
+                            continue
+                        elif line.strip().startswith('"""') and in_code_section:
+                            in_code_section = False
+                            continue
+                        
+                        # Capture code lines (skip empty lines in header)
+                        if in_code_section and line.strip():
+                            code_lines.append(line)
+                        # Also capture any code outside the header (fallback)
+                        elif not in_code_section and line.strip() and not line.strip().startswith('#'):
+                            code_lines.append(line)
+                    
+                    actual_code = '\n'.join(code_lines)
+                    
+                    if not actual_code.strip():
+                        logger.warning(f"No code found in file: {solution_file}")
+                        actual_code = solution['generated_code']  # Fallback to dataframe
+                        source = 'dataframe_fallback'
+                    else:
+                        source = 'file'
+                    
+                    logger.debug(f"Executing solution from {source}...")
+                    result = self.sandbox.execute_safely(
+                        actual_code,
+                        solution['tests'],
+                        solution['task_id']
+                    )
+                    
+                    execution_results.append({
+                        'task_id': solution['task_id'],
+                        'model': solution['model'],
+                        'strategy': solution['strategy'],
+                        'sample_id': solution['sample_id'],
+                        'source': source,
+                        **result
+                    })
+                    
+                    logger.debug(f"Execution result: {result['result']} (source: {source})")
+                    
+                except Exception as e:
+                    logger.error(f"Execution failed for solution {idx}: {e}")
+                    execution_results.append({
+                        'task_id': solution['task_id'],
+                        'model': solution['model'],
+                        'strategy': solution['strategy'],
+                        'sample_id': solution['sample_id'],
+                        'passed': False,
+                        'result': f'execution_error: {str(e)}',
+                        'output': traceback.format_exc(),
+                        'source': 'error'
+                    })
+            
+            # Log source statistics
+            sources = [r.get('source', 'unknown') for r in execution_results]
+            source_counts = {source: sources.count(source) for source in set(sources)}
+            logger.info(f"Execution sources: {source_counts}")
+            
+            return execution_results
+        
+    def run_full_evaluation(self, models: list = None, num_samples: int = None):
+        """Run complete evaluation pipeline with enhanced debugging"""
+        logger.info("Starting AI Model Evaluation Pipeline with Enhanced Debugging")
+        logger.info("=" * 60)
+        
+        # Configuration
+        if models is None:
+            models = self.config.get("models.default_models", ["codellama:7b"])
+        
+        if num_samples is None:
+            num_samples = self.config.get("evaluation.num_samples_per_task", 5)
+        
+        logger.info(f"Configuration: {len(models)} models, {num_samples} samples per task")
+        
+        try:
+            # Step 1: Load dataset with debugging
+            problems = self.debug_data_loading()
+            if not problems:
+                logger.error("No problems loaded from dataset!")
+                return None, None
+            
+            # Step 2: Check available models with debugging
+            models_to_use = self.debug_model_detection(models)
+            if not models_to_use:
+                logger.error("No models available for evaluation!")
+                return None, None
+            
+            # Step 3: Generate solutions with debugging
+            solutions_df = self.debug_code_generation(problems, models_to_use, num_samples)
+            if solutions_df.empty:
+                logger.error("No solutions generated!")
+                return None, None
+            
+            # Save generated solutions to CSV
+            solutions_path = Path(self.config.get("paths.results_dir")) / "generated_solutions.csv"
+            solutions_df.to_csv(solutions_path, index=False)
+            logger.info(f"Saved solutions CSV to: {solutions_path}")
+            
+            # Save individual solution files
+            solutions_dir = self.save_individual_solution_files(solutions_df, Path(self.config.get("paths.results_dir")))
+            logger.info(f"Individual solutions saved to: {solutions_dir}")
+            
+            # Step 4: Execute tests with debugging
+            execution_results = self.debug_test_execution(solutions_df)
+            
+            # Combine results
+            with DebugTimer("Results Combination"):
+                results_df = solutions_df.merge(
+                    pd.DataFrame(execution_results),
+                    on=['task_id', 'model', 'strategy', 'sample_id']
+                )
+                logger.info(f"Combined {len(results_df)} results")
+            
+            # Step 5: Calculate metrics with debugging
+            with DebugTimer("Metrics Calculation"):
+                logger.info("Calculating evaluation metrics...")
+                functional_metrics = self.metrics_calc.calculate_pass_at_k(results_df)
+                comparison_report = self.metrics_calc.generate_comparison_report(results_df)
+                logger.info("Metrics calculated successfully")
+            
+            # Step 6: Save results
+            with DebugTimer("Results Persistence"):
+                results_path = Path(self.config.get("paths.results_dir")) / "evaluation_results.csv"
+                results_df.to_csv(results_path, index=False)
+                
+                report_path = Path(self.config.get("paths.results_dir")) / "model_comparison.csv"
+                comparison_report.to_csv(report_path, index=False)
+                
+                logger.info(f"Results saved to:")
+                logger.info(f"   Solutions: {solutions_path}")
+                logger.info(f"   Individual Files: {solutions_dir}")
+                logger.info(f"   Full Results: {results_path}")
+                logger.info(f"   Comparison: {report_path}")
+            
+            # Step 7: Print summary
+            self.print_detailed_summary(functional_metrics, comparison_report, results_df)
+            
+            return results_df, comparison_report
+            
+        except Exception as e:
+            logger.error(f"Pipeline execution failed: {e}")
+            logger.debug(f"Full stack trace: {traceback.format_exc()}")
+            raise
+    
+    def print_detailed_summary(self, functional_metrics: dict, comparison_report: pd.DataFrame, results_df: pd.DataFrame):
+        """Print comprehensive evaluation summary"""
+        logger.info("EVALUATION COMPLETE!")
+        logger.info("=" * 60)
+        
+        # Overall statistics
+        total_solutions = len(results_df)
+        passed_solutions = results_df['passed'].sum()
+        pass_rate = (passed_solutions / total_solutions) * 100 if total_solutions > 0 else 0
+        
+        logger.info("OVERALL STATISTICS:")
+        logger.info(f"   Total Solutions: {total_solutions}")
+        logger.info(f"   Passed Solutions: {passed_solutions}")
+        logger.info(f"   Overall Pass Rate: {pass_rate:.1f}%")
+        
+        logger.info("FUNCTIONAL CORRECTNESS METRICS:")
+        for metric, value in functional_metrics.items():
+            logger.info(f"   {metric}: {value:.3f}")
+        
+        logger.info("\nMODEL COMPARISON:")
+        for _, model_row in comparison_report.iterrows():
+            logger.info(f"   {model_row['model']}:")
+            logger.info(f"     Pass Rate: {model_row['pass_rate']:.3f}")
+            logger.info(f"     Pass@1: {model_row['pass@1']:.3f}")
+            logger.info(f"     Pass@5: {model_row['pass@5']:.3f}")
+            logger.info(f"     Total Tests: {model_row['total_tests']}")
+
+def main():
+    """Main execution function with enhanced error handling"""
+    try:
+        logger.info("AI Model Evaluation Starting...")
+        
+        evaluator = AIModelEval()
+        
+        # Run evaluation with minimal configuration for testing
+        logger.info("Starting evaluation with test configuration...")
+        results, comparison = evaluator.run_full_evaluation(
+            models=["codellama:7b"],  # Start with one model
+            num_samples=2  # Fewer samples for initial testing
+        )
+        
+        if results is not None:
+            logger.info("\nEvaluation completed successfully!")
+            logger.info("Start the dashboard with: python dashboard/app.py")
+        else:
+            logger.error("Evaluation failed to produce results")
+            sys.exit(1)
+        
+    except Exception as e:
+        logger.error(f"Critical failure in main execution: {e}")
+        logger.error("Check the debug log file for detailed traceback")
+        traceback.print_exc()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+
+================================================================================
 FILE: all_codes.txt
 PATH: all_codes.txt
 ================================================================================
 
+================================================================================
+EXTRACTED CODE FILES
+Source Directory: .
+Excluded Folders: ['venv']
+================================================================================
 
+
+================================================================================
+FILE: ai_model_eval.py
+PATH: ai_model_eval.py
+================================================================================
+
+#!/usr/bin/env python3
+"""
+AI_ModelEval - Main execution script for evaluating AI code generation models
+Enhanced with layer-by-layer debugging and individual solution files
+ASCII-only logging for Windows compatibility
+"""
+
+import os
+import sys
+import pandas as pd
+import logging
+import traceback
+from pathlib import Path
+import time
+from datetime import datetime
+
+# Add src to path
+sys.path.append(str(Path(__file__).parent / 'src'))
+
+from data_layer.config_manager import ConfigManager
+from data_layer.dataset_loader import HumanEvalLoader
+from analysis_layer.static_analysis import analyze_dataset
+from model_layer.model_integration import ModelManager
+from model_layer.prompt_engine import PromptEngine
+from model_layer.code_generator import CodeGenerator
+from evaluation_layer.sandbox_executor import SandboxExecutor
+from evaluation_layer.metrics_calculator import MetricsCalculator
+
+# Setup ASCII-only logging for Windows compatibility
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s - %(levelname)s - [%(name)s] - %(message)s',
+    handlers=[
+        logging.FileHandler(f"evaluation_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log", encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+class DebugTimer:
+    """Utility class for timing and debugging each layer"""
+    def __init__(self, operation_name: str):
+        self.operation_name = operation_name
+        self.start_time = time.time()
+        logger.info(f"STARTING: {operation_name}")
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        elapsed = time.time() - self.start_time
+        if exc_type:
+            logger.error(f"FAILED: {self.operation_name} after {elapsed:.2f}s - {exc_val}")
+            logger.debug(f"Stack trace: {traceback.format_exc()}")
+        else:
+            logger.info(f"COMPLETED: {self.operation_name} in {elapsed:.2f}s")
+
+class AIModelEval:
+    def __init__(self, config_path: str = "config/settings.yaml"):
+        with DebugTimer("Configuration Initialization"):
+            self.config = ConfigManager(config_path)
+            self.config.ensure_dirs()
+            
+            # Initialize components with debugging
+            logger.info("Initializing system components...")
+            self.model_manager = ModelManager(self.config)
+            self.prompt_engine = PromptEngine()
+            self.code_generator = CodeGenerator(self.model_manager, self.prompt_engine)
+            self.sandbox = SandboxExecutor(timeout=self.config.get("evaluation.timeout_seconds", 30))
+            self.metrics_calc = MetricsCalculator()
+            logger.info("All components initialized successfully")
+    
+    def save_individual_solution_files(self, solutions_df: pd.DataFrame, base_dir: Path):
+        """Save each solution as a separate Python file with organized directory structure"""
+        with DebugTimer("Saving Individual Solution Files"):
+            solutions_dir = base_dir / "individual_solutions"
+            solutions_dir.mkdir(exist_ok=True)
+        
+            logger.info(f"Creating directory structure in: {solutions_dir}")
+            files_created = 0
+            errors = 0
+        
+            for idx, solution in solutions_df.iterrows():
+                try:
+                    if solution.get('error'):
+                        logger.warning(f"Skipping solution with generation error: {solution['task_id']}")
+                        continue
+                
+                # Create directory structure
+                    model_clean = solution['model'].replace(':', '_').replace('/', '_')
+                    strategy_clean = solution['strategy'].replace(':', '_').replace('/', '_')
+                    task_clean = solution['task_id'].replace('/', '_')
+                
+                    model_dir = solutions_dir / model_clean
+                    strategy_dir = model_dir / strategy_clean
+                    task_dir = strategy_dir / task_clean
+                    task_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Clean the generated code - remove [PYTHON] tags and extract actual code
+                    generated_code = solution['generated_code']
+                
+                # Remove [PYTHON] tags if present
+                    if '[PYTHON]' in generated_code and '[/PYTHON]' in generated_code:
+                        # Extract code between [PYTHON] tags
+                        start_idx = generated_code.find('[PYTHON]') + len('[PYTHON]')
+                        end_idx = generated_code.find('[/PYTHON]')
+                        generated_code = generated_code[start_idx:end_idx].strip()
+                    elif '```python' in generated_code and '```' in generated_code:
+                        # Extract code between ```python blocks
+                        start_idx = generated_code.find('```python') + len('```python')
+                        end_idx = generated_code.find('```', start_idx)
+                        generated_code = generated_code[start_idx:end_idx].strip()
+                    elif '```' in generated_code:
+                        # Extract code between ``` blocks
+                        start_idx = generated_code.find('```') + len('```')
+                        end_idx = generated_code.find('```', start_idx)
+                        generated_code = generated_code[start_idx:end_idx].strip()
+                
+                    # Create solution file
+                    filename = task_dir / f"sample_{solution['sample_id']}.py"
+                
+                    # Write the solution with metadata header
+                    with open(filename, 'w', encoding='utf-8') as f:
+                        f.write(f'"""\n')
+                        f.write(f'AI Generated Solution\n')
+                        f.write(f'Task ID: {solution["task_id"]}\n')
+                        f.write(f'Model: {solution["model"]}\n')
+                        f.write(f'Strategy: {solution["strategy"]}\n')
+                        f.write(f'Sample ID: {solution["sample_id"]}\n')
+                        f.write(f'Generated: {datetime.now().isoformat()}\n')
+                        f.write(f'"""\n\n')
+                        f.write(generated_code)
+                
+                # Create test file for this solution
+                    test_filename = task_dir / f"test_sample_{solution['sample_id']}.py"
+                    with open(test_filename, 'w', encoding='utf-8') as f:
+                        f.write(f'"""\n')
+                        f.write(f'Test for AI Generated Solution\n')
+                        f.write(f'Task ID: {solution["task_id"]}\n')
+                        f.write(f'Model: {solution["model"]}\n')
+                        f.write(f'"""\n\n')
+                        f.write(generated_code)
+                        f.write('\n\n')
+                        f.write(solution['tests'])
+                
+                    files_created += 2
+                    if files_created % 10 == 0:
+                        logger.debug(f"Created {files_created} files so far...")
+                    
+                except Exception as e:
+                    errors += 1
+                    logger.error(f"Failed to save solution file for {solution['task_id']}: {e}")
+                    logger.debug(f"Solution data: {solution.get('generated_code', 'NO_CODE')[:100]}...")
+        
+            logger.info(f"Saved {files_created} individual files ({errors} errors)")
+            return solutions_dir    
+
+
+    def debug_model_detection(self, models: list) -> list:
+        """Debug model availability with detailed logging"""
+        with DebugTimer("Model Detection and Validation"):
+            logger.info("Checking model availability...")
+            
+            available_models = self.model_manager.get_available_models()
+            logger.info(f"Available models: {available_models}")
+            
+            if not available_models:
+                logger.warning("No models detected via API")
+                logger.info("Attempting fallback to common models...")
+                models_to_use = ["codellama:7b"]
+                logger.info(f"Will attempt to use: {models_to_use}")
+            else:
+                # Use only available models
+                models_to_use = [m for m in models if m in available_models]
+                if not models_to_use:
+                    logger.error("No available models found from requested list!")
+                    logger.info(f"Requested: {models}, Available: {available_models}")
+                    logger.info("Try pulling a model first: ollama pull codellama:7b")
+                    return []
+            
+            logger.info(f"Final model selection: {models_to_use}")
+            return models_to_use
+    
+    def debug_data_loading(self):
+        """Debug data loading process"""
+        with DebugTimer("Dataset Loading"):
+            logger.info("Loading HumanEval dataset...")
+            loader = HumanEvalLoader(
+                self.config.get("paths.repo_url"),
+                self.config.get("paths.data_dir")
+            )
+            
+            logger.debug("Fetching repository...")
+            loader.fetch_repo()
+            
+            logger.debug("Loading problems from dataset...")
+            problems = loader.load_dataset()
+            
+            logger.info(f"Loaded {len(problems)} problems")
+            if problems:
+                logger.debug(f"Sample problem IDs: {[p['task_id'] for p in problems[:3]]}")
+            
+            return problems
+    
+    def debug_code_generation(self, problems: list, models_to_use: list, num_samples: int):
+        """Debug code generation with detailed progress tracking"""
+        with DebugTimer("Code Generation"):
+            logger.info("Generating code solutions...")
+            logger.debug(f"Generating {num_samples} samples each for {len(problems)} problems using {len(models_to_use)} models")
+            
+            # Use a small subset for testing
+            test_problems = problems[:3]  # Reduced from 5 to 3 for faster testing
+            
+            solutions_df = self.code_generator.generate_solutions(
+                test_problems,
+                models_to_use,
+                num_samples=num_samples,
+                strategies=["zero_shot"]
+            )
+            
+            # Analyze generation results
+            total_solutions = len(solutions_df)
+            if 'error' in solutions_df.columns:
+                successful_solutions = len(solutions_df[solutions_df['error'].isna()])
+            else:
+                successful_solutions = total_solutions
+            failed_solutions = total_solutions - successful_solutions
+            
+            logger.info(f"Generation results: {successful_solutions} successful, {failed_solutions} failed")
+            
+            if failed_solutions > 0:
+                logger.warning(f"{failed_solutions} solutions failed generation")
+                if 'error' in solutions_df.columns:
+                    failed_samples = solutions_df[solutions_df['error'].notna()]
+                    for _, failed in failed_samples.head(3).iterrows():
+                        logger.debug(f"Failed sample: {failed['task_id']} - {failed.get('error', 'Unknown error')}")
+            
+            return solutions_df
+    
+    """Debug test execution using individual solution files"""
+    def debug_test_execution(self, solutions_df: pd.DataFrame):
+        with DebugTimer("Test Execution from Individual Files"):
+            logger.info("Executing tests from individual solution files...")
+            execution_results = []
+            total_tests = len(solutions_df)
+            
+            for idx, solution in solutions_df.iterrows():
+                try:
+                    logger.debug(f"Testing solution {idx+1}/{total_tests}: {solution['task_id']} - {solution['model']}")
+                    
+                    if solution.get('error'):
+                        logger.warning(f"Skipping execution for solution with generation error")
+                        execution_results.append({
+                            'task_id': solution['task_id'],
+                            'model': solution['model'],
+                            'strategy': solution['strategy'],
+                            'sample_id': solution['sample_id'],
+                            'passed': False,
+                            'result': 'generation_error',
+                            'output': solution.get('error', 'Unknown error'),
+                            'source': 'dataframe'  # Mark source
+                        })
+                        continue
+                    
+                    # Get the individual solution file path
+                    model_clean = solution['model'].replace(':', '_').replace('/', '_')
+                    strategy_clean = solution['strategy'].replace(':', '_').replace('/', '_')
+                    task_clean = solution['task_id'].replace('/', '_')
+                    
+                    solution_file = (Path(self.config.get("paths.results_dir")) / 
+                                   "individual_solutions" / model_clean / strategy_clean / 
+                                   task_clean / f"sample_{solution['sample_id']}.py")
+                    
+                    if not solution_file.exists():
+                        logger.warning(f"Solution file not found: {solution_file}")
+                        execution_results.append({
+                            'task_id': solution['task_id'],
+                            'model': solution['model'],
+                            'strategy': solution['strategy'],
+                            'sample_id': solution['sample_id'],
+                            'passed': False,
+                            'result': 'file_not_found',
+                            'output': f'Solution file not found: {solution_file}',
+                            'source': 'dataframe'
+                        })
+                        continue
+                    
+                    # Read the actual code from the individual file
+                    logger.debug(f"Reading solution from: {solution_file}")
+                    with open(solution_file, 'r', encoding='utf-8') as f:
+                        file_content = f.read()
+                    
+                    # Extract just the function code (skip metadata header)
+                    lines = file_content.split('\n')
+                    code_lines = []
+                    in_code_section = False
+                    
+                    for line in lines:
+                        # Start capturing after the header (triple quotes)
+                        if line.strip().startswith('"""') and not in_code_section:
+                            in_code_section = True
+                            continue
+                        elif line.strip().startswith('"""') and in_code_section:
+                            in_code_section = False
+                            continue
+                        
+                        # Capture code lines (skip empty lines in header)
+                        if in_code_section and line.strip():
+                            code_lines.append(line)
+                        # Also capture any code outside the header (fallback)
+                        elif not in_code_section and line.strip() and not line.strip().startswith('#'):
+                            code_lines.append(line)
+                    
+                    actual_code = '\n'.join(code_lines)
+                    
+                    if not actual_code.strip():
+                        logger.warning(f"No code found in file: {solution_file}")
+                        actual_code = solution['generated_code']  # Fallback to dataframe
+                        source = 'dataframe_fallback'
+                    else:
+                        source = 'file'
+                    
+                    logger.debug(f"Executing solution from {source}...")
+                    result = self.sandbox.execute_safely(
+                        actual_code,
+                        solution['tests'],
+                        solution['task_id']
+                    )
+                    
+                    execution_results.append({
+                        'task_id': solution['task_id'],
+                        'model': solution['model'],
+                        'strategy': solution['strategy'],
+                        'sample_id': solution['sample_id'],
+                        'source': source,
+                        **result
+                    })
+                    
+                    logger.debug(f"Execution result: {result['result']} (source: {source})")
+                    
+                except Exception as e:
+                    logger.error(f"Execution failed for solution {idx}: {e}")
+                    execution_results.append({
+                        'task_id': solution['task_id'],
+                        'model': solution['model'],
+                        'strategy': solution['strategy'],
+                        'sample_id': solution['sample_id'],
+                        'passed': False,
+                        'result': f'execution_error: {str(e)}',
+                        'output': traceback.format_exc(),
+                        'source': 'error'
+                    })
+            
+            # Log source statistics
+            sources = [r.get('source', 'unknown') for r in execution_results]
+            source_counts = {source: sources.count(source) for source in set(sources)}
+            logger.info(f"Execution sources: {source_counts}")
+            
+            return execution_results
+        
+    def run_full_evaluation(self, models: list = None, num_samples: int = None):
+        """Run complete evaluation pipeline with enhanced debugging"""
+        logger.info("Starting AI Model Evaluation Pipeline with Enhanced Debugging")
+        logger.info("=" * 60)
+        
+        # Configuration
+        if models is None:
+            models = self.config.get("models.default_models", ["codellama:7b"])
+        
+        if num_samples is None:
+            num_samples = self.config.get("evaluation.num_samples_per_task", 5)
+        
+        logger.info(f"Configuration: {len(models)} models, {num_samples} samples per task")
+        
+        try:
+            # Step 1: Load dataset with debugging
+            problems = self.debug_data_loading()
+            if not problems:
+                logger.error("No problems loaded from dataset!")
+                return None, None
+            
+            # Step 2: Check available models with debugging
+            models_to_use = self.debug_model_detection(models)
+            if not models_to_use:
+                logger.error("No models available for evaluation!")
+                return None, None
+            
+            # Step 3: Generate solutions with debugging
+            solutions_df = self.debug_code_generation(problems, models_to_use, num_samples)
+            if solutions_df.empty:
+                logger.error("No solutions generated!")
+                return None, None
+            
+            # Save generated solutions to CSV
+            solutions_path = Path(self.config.get("paths.results_dir")) / "generated_solutions.csv"
+            solutions_df.to_csv(solutions_path, index=False)
+            logger.info(f"Saved solutions CSV to: {solutions_path}")
+            
+            # Save individual solution files
+            solutions_dir = self.save_individual_solution_files(solutions_df, Path(self.config.get("paths.results_dir")))
+            logger.info(f"Individual solutions saved to: {solutions_dir}")
+            
+            # Step 4: Execute tests with debugging
+            execution_results = self.debug_test_execution(solutions_df)
+            
+            # Combine results
+            with DebugTimer("Results Combination"):
+                results_df = solutions_df.merge(
+                    pd.DataFrame(execution_results),
+                    on=['task_id', 'model', 'strategy', 'sample_id']
+                )
+                logger.info(f"Combined {len(results_df)} results")
+            
+            # Step 5: Calculate metrics with debugging
+            with DebugTimer("Metrics Calculation"):
+                logger.info("Calculating evaluation metrics...")
+                functional_metrics = self.metrics_calc.calculate_pass_at_k(results_df)
+                comparison_report = self.metrics_calc.generate_comparison_report(results_df)
+                logger.info("Metrics calculated successfully")
+            
+            # Step 6: Save results
+            with DebugTimer("Results Persistence"):
+                results_path = Path(self.config.get("paths.results_dir")) / "evaluation_results.csv"
+                results_df.to_csv(results_path, index=False)
+                
+                report_path = Path(self.config.get("paths.results_dir")) / "model_comparison.csv"
+                comparison_report.to_csv(report_path, index=False)
+                
+                logger.info(f"Results saved to:")
+                logger.info(f"   Solutions: {solutions_path}")
+                logger.info(f"   Individual Files: {solutions_dir}")
+                logger.info(f"   Full Results: {results_path}")
+                logger.info(f"   Comparison: {report_path}")
+            
+            # Step 7: Print summary
+            self.print_detailed_summary(functional_metrics, comparison_report, results_df)
+            
+            return results_df, comparison_report
+            
+        except Exception as e:
+            logger.error(f"Pipeline execution failed: {e}")
+            logger.debug(f"Full stack trace: {traceback.format_exc()}")
+            raise
+    
+    def print_detailed_summary(self, functional_metrics: dict, comparison_report: pd.DataFrame, results_df: pd.DataFrame):
+        """Print comprehensive evaluation summary"""
+        logger.info("EVALUATION COMPLETE!")
+        logger.info("=" * 60)
+        
+        # Overall statistics
+        total_solutions = len(results_df)
+        passed_solutions = results_df['passed'].sum()
+        pass_rate = (passed_solutions / total_solutions) * 100 if total_solutions > 0 else 0
+        
+        logger.info("OVERALL STATISTICS:")
+        logger.info(f"   Total Solutions: {total_solutions}")
+        logger.info(f"   Passed Solutions: {passed_solutions}")
+        logger.info(f"   Overall Pass Rate: {pass_rate:.1f}%")
+        
+        logger.info("FUNCTIONAL CORRECTNESS METRICS:")
+        for metric, value in functional_metrics.items():
+            logger.info(f"   {metric}: {value:.3f}")
+        
+        logger.info("\nMODEL COMPARISON:")
+        for _, model_row in comparison_report.iterrows():
+            logger.info(f"   {model_row['model']}:")
+            logger.info(f"     Pass Rate: {model_row['pass_rate']:.3f}")
+            logger.info(f"     Pass@1: {model_row['pass@1']:.3f}")
+            logger.info(f"     Pass@5: {model_row['pass@5']:.3f}")
+            logger.info(f"     Total Tests: {model_row['total_tests']}")
+
+def main():
+    """Main execution function with enhanced error handling"""
+    try:
+        logger.info("AI Model Evaluation Starting...")
+        
+        evaluator = AIModelEval()
+        
+        # Run evaluation with minimal configuration for testing
+        logger.info("Starting evaluation with test configuration...")
+        results, comparison = evaluator.run_full_evaluation(
+            models=["codellama:7b"],  # Start with one model
+            num_samples=2  # Fewer samples for initial testing
+        )
+        
+        if results is not None:
+            logger.info("\nEvaluation completed successfully!")
+            logger.info("Start the dashboard with: python dashboard/app.py")
+        else:
+            logger.error("Evaluation failed to produce results")
+            sys.exit(1)
+        
+    except Exception as e:
+        logger.error(f"Critical failure in main execution: {e}")
+        logger.error("Check the debug log file for detailed traceback")
+        traceback.print_exc()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
 
 ================================================================================
 FILE: baseline_analysis.py
@@ -135,8 +1152,122 @@ FILE: demo.py
 PATH: demo.py
 ================================================================================
 
-{"task_id": "HumanEval/48", "prompt": "\n\ndef is_palindrome(text: str):\n    \"\"\"\n    Checks if given string is a palindrome\n    >>> is_palindrome('')\n    True\n    >>> is_palindrome('aba')\n    True\n    >>> is_palindrome('aaaaa')\n    True\n    >>> is_palindrome('zbcd')\n    False\n    \"\"\"\n", "entry_point": "is_palindrome", "canonical_solution": "    for i in range(len(text)):\n        if text[i] != text[len(text) - 1 - i]:\n            return False\n    return True\n", "test": "\n\nMETADATA = {}\n\n\ndef check(candidate):\n    assert candidate('') == True\n    assert candidate('aba') == True\n    assert candidate('aaaaa') == True\n    assert candidate('zbcd') == False\n    assert candidate('xywyx') == True\n    assert candidate('xywyz') == False\n    assert candidate('xywzx') == False\n\n"}
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from datetime import datetime, timedelta
+import numpy as np
 
+# Create figure and axis
+fig, ax = plt.subplots(1, 1, figsize=(14, 10))
+
+# Define milestones and tasks with durations
+milestones = {
+    'Milestone 1: Foundation': [
+        ('Environment Setup & Data Acquisition', 1),
+        ('Static Analysis Tools Configuration', 2),
+        ('Human Baseline Metrics Calculation', 1)
+    ],
+    'Milestone 2: Code Generation': [
+        ('Design Prompt Strategies', 2),
+        ('Configure Free LLM APIs', 1),
+        ('Automated Code Generation', 2)
+    ],
+    'Milestone 3: Functional Testing': [
+        ('Implement Secure Sandbox', 2),
+        ('Automated Test Execution', 1),
+        ('Calculate Pass@k Metrics', 1)
+    ],
+    'Milestone 4: Quality Analysis': [
+        ('Batch Static Analysis', 2),
+        ('Data Aggregation & Normalization', 1),
+        ('Statistical Comparison', 1)
+    ],
+    'Milestone 5: Synthesis & Reporting': [
+        ('Implement TOPSIS Algorithm', 2),
+        ('Final Rankings & Dashboard Deployment', 2),
+        ('Final Documentation & Submission', 1)
+    ]
+}
+
+# Colors for different milestones
+colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7']
+
+# Calculate positions and dates
+start_date = datetime(2024, 9, 1)
+current_week = 0
+y_pos = 0
+
+# Plot each task
+for i, (milestone, tasks) in enumerate(milestones.items()):
+    # Add milestone label
+    ax.text(-0.5, y_pos + len(tasks)/2 - 0.5, milestone, 
+            ha='right', va='center', fontweight='bold', fontsize=10)
+    
+    for j, (task, duration) in enumerate(tasks):
+        # Calculate start and end weeks
+        start_week = current_week
+        end_week = current_week + duration
+        
+        # Create rectangle for task
+        rect = patches.Rectangle(
+            (start_week, y_pos), duration, 0.8,
+            linewidth=1, edgecolor='black', facecolor=colors[i], alpha=0.7
+        )
+        ax.add_patch(rect)
+        
+        # Add task text
+        ax.text(start_week + duration/2, y_pos + 0.4, task, 
+                ha='center', va='center', fontsize=9, weight='bold')
+        
+        # Add week labels
+        ax.text(start_week, y_pos - 0.1, f'W{start_week+1}', 
+                ha='left', va='top', fontsize=8)
+        if j == len(tasks) - 1:  # Last task in milestone
+            ax.text(end_week, y_pos - 0.1, f'W{end_week+1}', 
+                    ha='right', va='top', fontsize=8)
+        
+        y_pos += 1
+        current_week = end_week
+    
+    y_pos += 0.5  # Space between milestones
+
+# Configure plot appearance
+ax.set_xlim(-2, 16)
+ax.set_ylim(0, y_pos)
+ax.set_xlabel('Weeks', fontweight='bold', fontsize=12)
+ax.set_ylabel('Tasks', fontweight='bold', fontsize=12)
+ax.set_title('CodeQualBench Project Timeline (15 Weeks)', 
+             fontweight='bold', fontsize=14, pad=20)
+
+# Add week grid
+for week in range(0, 16):
+    ax.axvline(x=week, color='gray', linestyle='--', alpha=0.3, linewidth=0.5)
+
+# Customize ticks
+ax.set_xticks(range(0, 16))
+ax.set_xticklabels([f'W{i+1}' for i in range(16)])
+ax.set_yticks([])
+
+# Add legend
+legend_elements = [
+    patches.Patch(color=colors[i], label=list(milestones.keys())[i])
+    for i in range(len(milestones))
+]
+ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(0, -0.1))
+
+plt.tight_layout()
+plt.grid(True, axis='x', alpha=0.3)
+plt.show()
+
+# Print summary
+print("Project Timeline Summary:")
+print("=" * 50)
+current_week = 0
+for milestone, tasks in milestones.items():
+    print(f"\n{milestone}:")
+    for task, duration in tasks:
+        print(f"  Weeks {current_week+1}-{current_week+duration}: {task}")
+        current_week += duration
 
 ================================================================================
 FILE: extractor.py
@@ -275,6 +1406,144 @@ if __name__ == "__main__":
     main()
 
 ================================================================================
+FILE: memory_test.py
+PATH: memory_test.py
+================================================================================
+
+import requests
+import json
+import psutil
+
+def analyze_memory_usage():
+    print("📊 Detailed Memory Analysis:")
+    memory = psutil.virtual_memory()
+    print(f"Total: {memory.total / (1024**3):.2f} GB")
+    print(f"Available: {memory.available / (1024**3):.2f} GB")
+    print(f"Used: {memory.used / (1024**3):.2f} GB")
+    print(f"Percent: {memory.percent}%")
+    
+    print("\n🔍 Top memory consumers:")
+    processes = []
+    for proc in psutil.process_iter(['pid', 'name', 'memory_info']):
+        try:
+            mem_usage = proc.info['memory_info'].rss / (1024**3)
+            if mem_usage > 0.1:  # Show > 100MB
+                processes.append((proc.info['name'], mem_usage))
+        except:
+            pass
+    
+    # Sort by memory usage
+    processes.sort(key=lambda x: x[1], reverse=True)
+    for name, usage in processes[:10]:
+        print(f"   {name}: {usage:.2f} GB")
+
+analyze_memory_usage()
+
+def test_ollama_memory():
+    """Test if Ollama can handle the model with current memory settings"""
+    
+    # Test with a very small prompt first
+    test_payload = {
+        "model": "codellama:7b",
+        "prompt": "def hello(): return 'world'",
+        "stream": False,
+        "options": {
+            "num_predict": 50,  # Very short response
+            "temperature": 0.7
+        }
+    }
+    
+    try:
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json=test_payload,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            print("✅ Ollama generation successful!")
+            print(f"Response: {result.get('response', '')[:100]}...")
+            return True
+        else:
+            print(f"❌ Ollama failed with status: {response.status_code}")
+            print(f"Error: {response.text}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Ollama test failed: {e}")
+        return False
+
+if __name__ == "__main__":
+    analyze_memory_usage()
+
+================================================================================
+FILE: quick_start.py
+PATH: quick_start.py
+================================================================================
+
+#!/usr/bin/env python3
+"""
+Quick start script for AI_ModelEval
+"""
+
+import subprocess
+import sys
+import os
+
+def run_command(command, description):
+    print(f"\n🔧 {description}...")
+    print(f"   Command: {command}")
+    try:
+        result = subprocess.run(command, shell=True, check=True)
+        print(f"   ✅ {description} completed")
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"   ❌ {description} failed: {e}")
+        return False
+
+def main():
+    print("🚀 AI_ModelEval Quick Start")
+    print("=" * 50)
+    
+    # Check if we're in a virtual environment
+    if not hasattr(sys, 'real_prefix') and not (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
+        print("❌ Please activate your virtual environment first!")
+        print("   On Windows: venv\\Scripts\\activate")
+        print("   On Linux/Mac: source venv/bin/activate")
+        return
+    
+    # Step 1: Install dependencies
+    if not run_command("pip install -r requirements.txt", "Installing dependencies"):
+        return
+    
+    # Step 2: Check Ollama
+    if not run_command("ollama --version", "Checking Ollama"):
+        print("⚠️  Ollama not found. Please install it from https://ollama.ai/")
+        return
+    
+    # Step 3: Pull a model
+    if not run_command("ollama pull codellama:7b", "Downloading CodeLlama model"):
+        return
+    
+    # Step 4: Run baseline analysis
+    if not run_command("python baseline_analysis.py", "Running baseline analysis"):
+        return
+    
+    # Step 5: Run AI evaluation
+    if not run_command("python ai_model_eval.py", "Running AI model evaluation"):
+        return
+    
+    print("\n🎉 Setup completed successfully!")
+    print("\n📊 Next steps:")
+    print("   1. Start the dashboard: python dashboard/app_enhanced.py")
+    print("   2. Open http://localhost:5000 in your browser")
+    print("   3. Explore the model comparison and evaluation results")
+
+if __name__ == "__main__":
+    main()
+
+================================================================================
 FILE: README.md
 PATH: README.md
 ================================================================================
@@ -327,6 +1596,15 @@ flask
 plotly
 pygments
 
+
+
+
+# AI Model Integration
+huggingface_hub
+ollama
+requests
+docker
+
 ================================================================================
 FILE: config\settings.yaml
 PATH: config\settings.yaml
@@ -334,16 +1612,31 @@ PATH: config\settings.yaml
 
 paths:
   data_dir: "data/human_eval_repo"
-  dataset_file: "data/human_eval_repo/data/HumanEval.jsonl"
-  results_dir: "results/baseline"
+  dataset_file: "data/human_eval_repo/data/HumanEval.jsonl.gz"
+  results_dir: "results"
   repo_url: "https://github.com/openai/human-eval.git"
 
+models:
+  hf_api_key: ""  # Add your HuggingFace token if needed
+  ollama_base_url: "http://localhost:11434"
+  default_models: ["codellama:7b", "starcoder:1b"]
+  
+evaluation:
+  num_samples_per_task: 5
+  timeout_seconds: 30
+  prompt_strategies: ["zero_shot", "few_shot"]
+  
+dashboard:
+  host: "0.0.0.0"
+  port: 5000
+  debug: true
 
 ================================================================================
 FILE: dashboard\app.py
 PATH: dashboard\app.py
 ================================================================================
 
+from venv import logger
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
 import json
@@ -355,24 +1648,31 @@ import plotly.utils
 
 app = Flask(__name__)
 
+
+
+
 class DashboardDataManager:
     def __init__(self):
         self.base_dir = Path(__file__).parent.parent
         self.metrics_df = None
         self.samples_data = None
+        self.evaluation_results = None
         self.load_data()
     
     def load_data(self):
-        """Load metrics and original dataset."""
+        """Load all data for enhanced dashboard"""
         try:
-            # Load metrics CSV
-            metrics_path = self.base_dir / "results" / "baseline" / "human_baseline_metrics.csv"
+            # Load baseline metrics
+            metrics_path = self.base_dir / "results" / "human_baseline_metrics.csv"
             if metrics_path.exists():
                 self.metrics_df = pd.read_csv(metrics_path)
-                print(f"✅ Loaded metrics for {len(self.metrics_df)} problems")
-            else:
-                print("❌ Metrics file not found. Run baseline_analysis.py first.")
-                return False
+                print(f"✅ Loaded baseline metrics for {len(self.metrics_df)} problems")
+            
+            # Load evaluation results
+            results_path = self.base_dir / "results" / "evaluation_results.csv"
+            if results_path.exists():
+                self.evaluation_results = pd.read_csv(results_path)
+                print(f"✅ Loaded evaluation results for {len(self.evaluation_results)} samples")
             
             # Load original dataset
             dataset_path = self.base_dir / "data" / "human_eval_repo" / "data" / "HumanEval.jsonl.gz"
@@ -382,10 +1682,7 @@ class DashboardDataManager:
                     for line in f:
                         self.samples_data.append(json.loads(line))
                 print(f"✅ Loaded {len(self.samples_data)} original problems")
-            else:
-                print("❌ Dataset not found.")
-                return False
-                
+            
             return True
             
         except Exception as e:
@@ -703,6 +2000,43 @@ def debug():
         'sample_problem_ids': [p['problem_id'] for p in problems[:3]] if problems else []
     })
 
+
+@app.route('/comparison/<int:problem_number>')
+def comparison(problem_number):
+    """Show side-by-side comparison of canonical and AI solutions"""
+    try:
+        # Get canonical solution
+        problem_id = f"HumanEval/{problem_number}"
+        canonical_data = data_manager.get_problem_details(problem_id)
+        if not canonical_data:
+            return f"Problem {problem_id} not found", 404
+        
+        # Get AI solutions for this problem
+        if data_manager.evaluation_results is not None:
+            ai_solutions = data_manager.evaluation_results[
+                data_manager.evaluation_results['task_id'] == problem_id
+            ].to_dict('records')
+        else:
+            ai_solutions = []
+        
+        # Extract function name from prompt
+        prompt = canonical_data.get('prompt', '')
+        function_name = "Unknown"
+        if 'def ' in prompt:
+            function_name = prompt.split('def ')[1].split('(')[0].strip()
+        
+        return render_template('comparison.html',
+                            problem_id=problem_id,
+                            function_name=function_name,
+                            prompt_preview=prompt[:100] + '...' if len(prompt) > 100 else prompt,
+                            canonical_solution=canonical_data.get('canonical_solution', ''),
+                            ai_solutions=ai_solutions,
+                            test_cases=canonical_data.get('test', ''))
+        
+    except Exception as e:
+        logger.error(f"Error loading comparison for {problem_id}: {e}")
+        return f"Error loading comparison: {e}", 500
+
 if __name__ == '__main__':
     if data_manager.load_data():
         print("🚀 Starting Code Quality Dashboard...")
@@ -711,6 +2045,145 @@ if __name__ == '__main__':
         app.run(debug=True, host='0.0.0.0', port=5000)
     else:
         print("❌ Failed to load data. Please run baseline_analysis.py first.")
+
+
+
+
+
+
+================================================================================
+FILE: dashboard\app_enhanced.py
+PATH: dashboard\app_enhanced.py
+================================================================================
+
+from flask import Flask, render_template, request, jsonify
+import pandas as pd
+import json
+import os
+from pathlib import Path
+import plotly.express as px
+import plotly.utils
+
+app = Flask(__name__)
+
+class EnhancedDashboardDataManager:
+    def __init__(self):
+        self.base_dir = Path(__file__).parent.parent
+        self.metrics_df = None
+        self.samples_data = None
+        self.evaluation_results = None
+        self.model_comparison = None
+        self.load_data()
+    
+    def load_data(self):
+        """Load all data for enhanced dashboard"""
+        try:
+            # Load baseline metrics
+            metrics_path = self.base_dir / "results" / "baseline" / "human_baseline_metrics.csv"
+            if metrics_path.exists():
+                self.metrics_df = pd.read_csv(metrics_path)
+                print(f"✅ Loaded baseline metrics for {len(self.metrics_df)} problems")
+            
+            # Load evaluation results
+            results_path = self.base_dir / "results" / "evaluation_results.csv"
+            if results_path.exists():
+                self.evaluation_results = pd.read_csv(results_path)
+                print(f"✅ Loaded evaluation results for {len(self.evaluation_results)} samples")
+            
+            # Load model comparison
+            comparison_path = self.base_dir / "results" / "model_comparison.csv"
+            if comparison_path.exists():
+                self.model_comparison = pd.read_csv(comparison_path)
+                print(f"✅ Loaded comparison for {len(self.model_comparison)} models")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error loading data: {e}")
+            return False
+    
+    def get_model_comparison_data(self):
+        """Get data for model comparison"""
+        if self.model_comparison is None:
+            return []
+        
+        return self.model_comparison.to_dict('records')
+    
+    def get_evaluation_results(self, model_filter=None):
+        """Get evaluation results with optional model filter"""
+        if self.evaluation_results is None:
+            return []
+        
+        results = self.evaluation_results
+        if model_filter:
+            results = results[results['model'] == model_filter]
+        
+        return results.to_dict('records')
+
+# Initialize enhanced data manager
+data_manager = EnhancedDashboardDataManager()
+
+@app.route('/')
+def index():
+    """Enhanced main dashboard"""
+    model_comparison = data_manager.get_model_comparison_data()
+    
+    return render_template('enhanced_index.html', 
+                         model_comparison=model_comparison,
+                         has_evaluation_data=len(model_comparison) > 0)
+
+@app.route('/model_comparison')
+def model_comparison():
+    """Model comparison page"""
+    models = data_manager.get_model_comparison_data()
+    return render_template('model_comparison.html', models=models)
+
+@app.route('/evaluation_results')
+def evaluation_results():
+    """Detailed evaluation results"""
+    model_filter = request.args.get('model')
+    results = data_manager.get_evaluation_results(model_filter)
+    return render_template('evaluation_results.html', 
+                         results=results, 
+                         model_filter=model_filter)
+
+@app.route('/api/model_metrics')
+def api_model_metrics():
+    """API for model metrics charts"""
+    models = data_manager.get_model_comparison_data()
+    
+    if not models:
+        return jsonify({'error': 'No model comparison data available'})
+    
+    # Create comparison chart data
+    model_names = [m['model'] for m in models]
+    pass_rates = [m['pass_rate'] for m in models]
+    pass_at_1 = [m.get('pass@1', 0) for m in models]
+    
+    chart_data = {
+        'pass_rates': {
+            'x': model_names,
+            'y': pass_rates,
+            'type': 'bar',
+            'name': 'Pass Rate'
+        },
+        'pass_at_1': {
+            'x': model_names,
+            'y': pass_at_1,
+            'type': 'bar',
+            'name': 'Pass@1'
+        }
+    }
+    
+    return jsonify(chart_data)
+
+if __name__ == '__main__':
+    if data_manager.load_data():
+        print("🚀 Starting Enhanced AI ModelEval Dashboard...")
+        print("📊 Open http://localhost:5000 in your browser")
+        app.run(debug=True, host='0.0.0.0', port=5000)
+    else:
+        print("❌ Failed to load data. Please run evaluation first.")
 
 ================================================================================
 FILE: dashboard\static\css\custom.css
@@ -1253,6 +2726,1085 @@ PATH: dashboard\templates\base.html
 </html>
 
 ================================================================================
+FILE: dashboard\templates\comparison.html
+PATH: dashboard\templates\comparison.html
+================================================================================
+
+{% extends "base.html" %}
+
+{% block title %}Solution Comparison - CodeQualBench{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-5">
+                <i class="fas fa-code-compare text-primary"></i> Solution Comparison
+            </h1>
+            <p class="lead text-muted">Comparing canonical solution with AI-generated alternatives for: <strong>{{ problem_id }}</strong></p>
+        </div>
+    </div>
+
+    <!-- Problem Info -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle"></i> Problem Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Problem ID:</strong> {{ problem_id }}<br>
+                            <strong>Function Name:</strong> {{ function_name }}<br>
+                            <strong>Total AI Solutions:</strong> {{ ai_solutions|length }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Prompt Preview:</strong><br>
+                            <code class="text-muted">{{ prompt_preview }}</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Solutions Comparison -->
+    <div class="row">
+        <!-- Canonical Solution -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-user-check"></i> Canonical Solution (Human)
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="p-3 border-bottom">
+                        <small class="text-muted">This is the original human-written solution from HumanEval</small>
+                    </div>
+                    <pre class="m-0 p-3"><code class="language-python">{{ canonical_solution }}</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Solutions -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-robot"></i> AI-Generated Solutions
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if ai_solutions %}
+                    <!-- Solution Tabs -->
+                    <ul class="nav nav-tabs" id="aiSolutionTabs" role="tablist">
+                        {% for solution in ai_solutions %}
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link {% if loop.first %}active{% endif %}" 
+                                    id="tab-{{ solution.model }}-{{ solution.sample_id }}" 
+                                    data-bs-toggle="tab" 
+                                    data-bs-target="#content-{{ solution.model }}-{{ solution.sample_id }}" 
+                                    type="button" role="tab">
+                                {{ solution.model }} #{{ solution.sample_id }}
+                                {% if solution.passed %}
+                                    <span class="badge bg-success ms-1">Pass</span>
+                                {% else %}
+                                    <span class="badge bg-danger ms-1">Fail</span>
+                                {% endif %}
+                            </button>
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                    <!-- Solution Content -->
+                    <div class="tab-content p-3" id="aiSolutionContent">
+                        {% for solution in ai_solutions %}
+                        <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
+                             id="content-{{ solution.model }}-{{ solution.sample_id }}" 
+                             role="tabpanel">
+                            
+                            <!-- Solution Header -->
+                            <div class="mb-3">
+                                <h6>Model: {{ solution.model }}</h6>
+                                <small class="text-muted">
+                                    Strategy: {{ solution.strategy }} | 
+                                    Sample: {{ solution.sample_id }} |
+                                    {% if solution.passed %}
+                                        <span class="text-success">✅ Tests Passed</span>
+                                    {% else %}
+                                        <span class="text-danger">❌ Tests Failed</span>
+                                    {% endif %}
+                                </small>
+                            </div>
+
+                            <!-- Generated Code -->
+                            <h6>Generated Code:</h6>
+                            <pre><code class="language-python">{{ solution.generated_code }}</code></pre>
+
+                            <!-- Test Results -->
+                            {% if not solution.passed and solution.output %}
+                            <h6 class="mt-3">Test Output:</h6>
+                            <div class="alert alert-warning small">
+                                <pre class="mb-0"><code>{{ solution.output }}</code></pre>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="p-3 text-center text-muted">
+                        <i class="fas fa-robot fa-2x mb-2"></i>
+                        <p>No AI solutions available for this problem.</p>
+                        <small>Run the evaluation first to generate AI solutions.</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Cases -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-vial"></i> Test Cases
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <pre><code class="language-python">{{ test_cases }}</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <a href="/" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left"></i> Back to Problems List
+            </a>
+            <a href="/problem/{{ problem_id.split('/')[1] }}" class="btn btn-outline-secondary">
+                <i class="fas fa-chart-bar"></i> View Detailed Metrics
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Initialize syntax highlighting
+if (typeof hljs !== 'undefined') {
+    hljs.highlightAll();
+}
+
+// Add copy functionality to code blocks
+document.querySelectorAll('pre code').forEach((block) => {
+    const pre = block.parentElement;
+    if (pre && !pre.querySelector('.copy-btn')) {
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'btn btn-sm btn-outline-secondary copy-btn';
+        copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+        copyBtn.style.position = 'absolute';
+        copyBtn.style.top = '10px';
+        copyBtn.style.right = '10px';
+        copyBtn.style.opacity = '0.7';
+        
+        copyBtn.addEventListener('click', function() {
+            navigator.clipboard.writeText(block.textContent).then(() => {
+                this.innerHTML = '<i class="fas fa-check"></i>';
+                this.classList.remove('btn-outline-secondary');
+                this.classList.add('btn-success');
+                setTimeout(() => {
+                    this.innerHTML = '<i class="fas fa-copy"></i>';
+                    this.classList.remove('btn-success');
+                    this.classList.add('btn-outline-secondary');
+                }, 2000);
+            });
+        });
+        
+        pre.style.position = 'relative';
+        pre.appendChild(copyBtn);
+    }
+});
+</script>
+{% endblock %}
+
+================================================================================
+FILE: dashboard\templates\enhanced_index.html
+PATH: dashboard\templates\enhanced_index.html
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI ModelEval Dashboard</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-robot"></i> AI ModelEval Dashboard
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/model_comparison">
+                            <i class="fas fa-chart-bar"></i> Model Comparison
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/evaluation_results">
+                            <i class="fas fa-list"></i> Evaluation Results
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1 class="display-4">
+                    <i class="fas fa-tachometer-alt text-primary"></i> AI Model Evaluation Dashboard
+                </h1>
+                <p class="lead text-muted">
+                    Compare AI code generation models on HumanEval benchmark
+                </p>
+            </div>
+        </div>
+
+        <!-- Summary Stats -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title">Models Evaluated</h6>
+                                <h2>{{ model_comparison|length if model_comparison else 0 }}</h2>
+                            </div>
+                            <i class="fas fa-robot fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title">Best Pass Rate</h6>
+                                <h2>
+                                    {% if model_comparison %}
+                                        {{ (model_comparison|map(attribute='pass_rate')|max * 100)|round(1) }}%
+                                    {% else %}
+                                        0%
+                                    {% endif %}
+                                </h2>
+                            </div>
+                            <i class="fas fa-trophy fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title">Total Tests</h6>
+                                <h2>
+                                    {% if model_comparison %}
+                                        {{ model_comparison|sum(attribute='total_tests') }}
+                                    {% else %}
+                                        0
+                                    {% endif %}
+                                </h2>
+                            </div>
+                            <i class="fas fa-vial fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title">Avg Execution Time</h6>
+                                <h2>
+                                    {% if model_comparison and model_comparison[0].get('avg_execution_time') %}
+                                        {{ model_comparison[0]['avg_execution_time']|round(2) }}s
+                                    {% else %}
+                                        0s
+                                    {% endif %}
+                                </h2>
+                            </div>
+                            <i class="fas fa-clock fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Comparison Table -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-table"></i> Model Performance Comparison
+                            {% if has_evaluation_data %}
+                                <span class="badge bg-success ms-2">Data Loaded</span>
+                            {% else %}
+                                <span class="badge bg-warning ms-2">No Data</span>
+                            {% endif %}
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if model_comparison %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Model</th>
+                                        <th>Pass Rate</th>
+                                        <th>Pass@1</th>
+                                        <th>Pass@5</th>
+                                        <th>Total Tests</th>
+                                        <th>Passed Tests</th>
+                                        <th>Avg Time</th>
+                                        <th>Rank</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for model in model_comparison|sort(attribute='pass_rate', reverse=true) %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ model.model }}</strong>
+                                            {% if loop.first %}
+                                                <span class="badge bg-warning ms-2">Best</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar 
+                                                    {% if model.pass_rate > 0.7 %}bg-success
+                                                    {% elif model.pass_rate > 0.4 %}bg-warning
+                                                    {% else %}bg-danger{% endif %}" 
+                                                    style="width: {{ model.pass_rate * 100 }}%">
+                                                    {{ (model.pass_rate * 100)|round(1) }}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>{{ (model.get('pass@1', 0) * 100)|round(1) }}%</td>
+                                        <td>{{ (model.get('pass@5', 0) * 100)|round(1) }}%</td>
+                                        <td>{{ model.total_tests }}</td>
+                                        <td>
+                                            <span class="badge bg-success">{{ model.passed_tests }}</span>
+                                        </td>
+                                        <td>
+                                            {% if model.get('avg_execution_time') %}
+                                                {{ model.avg_execution_time|round(2) }}s
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-dark">#{{ loop.index }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-robot fa-4x text-muted mb-3"></i>
+                            <h4>No Evaluation Data Available</h4>
+                            <p class="text-muted">Run the AI model evaluation first to generate comparison data.</p>
+                            <a href="#" class="btn btn-primary">
+                                <i class="fas fa-play"></i> Run Evaluation
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        {% if has_evaluation_data %}
+        <div class="row">
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-bar"></i> Model Pass Rates Comparison
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="passRateChart" style="height: 300px;">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-spinner fa-spin me-2"></i> Loading chart...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-line"></i> Pass@1 vs Pass@5
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="passAtKChart" style="height: 300px;">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-spinner fa-spin me-2"></i> Loading chart...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Quick Actions -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-bolt"></i> Quick Actions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <a href="/model_comparison" class="btn btn-primary w-100">
+                                    <i class="fas fa-chart-bar me-2"></i> Detailed Comparison
+                                </a>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <a href="/evaluation_results" class="btn btn-info w-100">
+                                    <i class="fas fa-list me-2"></i> View All Results
+                                </a>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <button onclick="refreshData()" class="btn btn-warning w-100">
+                                    <i class="fas fa-sync-alt me-2"></i> Refresh Data
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <button onclick="exportData()" class="btn btn-success w-100">
+                                    <i class="fas fa-download me-2"></i> Export Results
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Information -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-info-circle"></i> System Status
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Data Status:</h6>
+                                <ul class="list-unstyled">
+                                    <li>
+                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                        Models Loaded: <strong>{{ model_comparison|length if model_comparison else 0 }}</strong>
+                                    </li>
+                                    <li>
+                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                        Evaluation Complete: <strong>{{ "Yes" if has_evaluation_data else "No" }}</strong>
+                                    </li>
+                                    <li>
+                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                        Dashboard Active: <strong>Yes</strong>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Last Updated:</h6>
+                                <p class="text-muted">
+                                    <i class="fas fa-clock me-2"></i>
+                                    <span id="currentTime">Loading...</span>
+                                </p>
+                                <h6>Next Steps:</h6>
+                                <ul>
+                                    <li>View detailed model comparisons</li>
+                                    <li>Analyze individual evaluation results</li>
+                                    <li>Export data for further analysis</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light mt-5 py-4">
+        <div class="container text-center">
+            <p class="mb-0">AI ModelEval Dashboard - Evaluating Code Generation Models</p>
+            <small>Built with Flask, Plotly, and Bootstrap</small>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Update current time
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+            document.getElementById('currentTime').textContent = timeString;
+        }
+        
+        // Initial time update
+        updateTime();
+        // Update time every second
+        setInterval(updateTime, 1000);
+
+        {% if has_evaluation_data %}
+        // Load charts when page is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCharts();
+        });
+
+        function loadCharts() {
+            // Fetch chart data from API
+            fetch('/api/model_metrics')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error loading chart data:', data.error);
+                        showChartError();
+                        return;
+                    }
+
+                    // Create Pass Rate Chart
+                    const passRateTrace = {
+                        x: data.pass_rates.x,
+                        y: data.pass_rates.y,
+                        type: 'bar',
+                        name: 'Pass Rate',
+                        marker: {
+                            color: data.pass_rates.y.map(rate => 
+                                rate > 0.7 ? '#27ae60' : 
+                                rate > 0.4 ? '#f39c12' : '#e74c3c'
+                            )
+                        }
+                    };
+
+                    const passRateLayout = {
+                        title: 'Model Pass Rates',
+                        xaxis: { title: 'Model' },
+                        yaxis: { 
+                            title: 'Pass Rate', 
+                            tickformat: ',.0%',
+                            range: [0, 1]
+                        },
+                        height: 300
+                    };
+
+                    Plotly.newPlot('passRateChart', [passRateTrace], passRateLayout);
+
+                    // Create Pass@1 vs Pass@5 Chart
+                    const passAt1Trace = {
+                        x: data.pass_at_1.x,
+                        y: data.pass_at_1.y,
+                        type: 'bar',
+                        name: 'Pass@1',
+                        marker: { color: '#3498db' }
+                    };
+
+                    const passAt5Trace = {
+                        x: data.pass_at_1.x,
+                        y: data.pass_rates.y, // Using pass rates as proxy for Pass@5
+                        type: 'bar',
+                        name: 'Pass Rate',
+                        marker: { color: '#9b59b6' }
+                    };
+
+                    const passAtKLayout = {
+                        title: 'Pass@1 vs Overall Pass Rate',
+                        xaxis: { title: 'Model' },
+                        yaxis: { 
+                            title: 'Rate', 
+                            tickformat: ',.0%',
+                            range: [0, 1]
+                        },
+                        barmode: 'group',
+                        height: 300
+                    };
+
+                    Plotly.newPlot('passAtKChart', [passAt1Trace, passAt5Trace], passAtKLayout);
+                })
+                .catch(error => {
+                    console.error('Error loading charts:', error);
+                    showChartError();
+                });
+        }
+
+        function showChartError() {
+            document.getElementById('passRateChart').innerHTML = 
+                '<div class="text-center text-muted py-4">Failed to load charts</div>';
+            document.getElementById('passAtKChart').innerHTML = 
+                '<div class="text-center text-muted py-4">Failed to load charts</div>';
+        }
+        {% endif %}
+
+        function refreshData() {
+            location.reload();
+        }
+
+        function exportData() {
+            alert('Export functionality would download all evaluation data as CSV');
+            // In a real implementation, this would trigger a file download
+        }
+    </script>
+</body>
+</html>
+
+================================================================================
+FILE: dashboard\templates\evaluation_results.html
+PATH: dashboard\templates\evaluation_results.html
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evaluation Results - AI ModelEval</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Highlight.js for code syntax -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+    <style>
+        .code-block {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .test-result {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+        }
+        .test-pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .test-fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .test-error {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .problem-card {
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        .problem-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-robot"></i> AI ModelEval
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/model_comparison">
+                            <i class="fas fa-chart-bar"></i> Model Comparison
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/evaluation_results">
+                            <i class="fas fa-list"></i> Evaluation Results
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1 class="display-4">
+                    <i class="fas fa-list text-primary"></i> Evaluation Results
+                </h1>
+                <p class="lead text-muted">
+                    Detailed view of all AI model evaluation results
+                    {% if model_filter %}
+                    <span class="badge bg-info">Filtered by: {{ model_filter }}</span>
+                    {% endif %}
+                </p>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+                        <li class="breadcrumb-item active">Evaluation Results</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Filter Controls -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-filter"></i> Filter and Search
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Filter by Model:</label>
+                                <select id="modelFilter" class="form-select" onchange="filterByModel()">
+                                    <option value="">All Models</option>
+                                    {% if results %}
+                                        {% set unique_models = results|map(attribute='model')|unique|list %}
+                                        {% for model in unique_models|sort %}
+                                        <option value="{{ model }}" 
+                                                {% if model_filter == model %}selected{% endif %}>
+                                            {{ model }}
+                                        </option>
+                                        {% endfor %}
+                                    {% endif %}
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Filter by Status:</label>
+                                <select id="statusFilter" class="form-select" onchange="filterByStatus()">
+                                    <option value="">All Results</option>
+                                    <option value="passed">Passed Only</option>
+                                    <option value="failed">Failed Only</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Search:</label>
+                                <div class="input-group">
+                                    <input type="text" id="searchInput" class="form-control" 
+                                           placeholder="Search task ID or model...">
+                                    <button class="btn btn-primary" onclick="searchResults()">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Summary -->
+        {% if results %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-pie"></i> Results Summary
+                            <span class="badge bg-info ms-2">{{ results|length }} Results</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title">Passed Tests</h6>
+                                        <h3>
+                                            {% set passed_count = results|selectattr('passed')|list|length %}
+                                            {{ passed_count }}
+                                        </h3>
+                                        <small>{{ (passed_count / results|length * 100)|round(1) }}% Success</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-danger text-white">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title">Failed Tests</h6>
+                                        <h3>
+                                            {% set failed_count = results|length - passed_count %}
+                                            {{ failed_count }}
+                                        </h3>
+                                        <small>{{ (failed_count / results|length * 100)|round(1) }}% Failure</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title">Unique Models</h6>
+                                        <h3>
+                                            {% set unique_models = results|map(attribute='model')|unique|list|length %}
+                                            {{ unique_models }}
+                                        </h3>
+                                        <small>Different AI models</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-warning text-white">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title">Unique Problems</h6>
+                                        <h3>
+                                            {% set unique_problems = results|map(attribute='task_id')|unique|list|length %}
+                                            {{ unique_problems }}
+                                        </h3>
+                                        <small>Different HumanEval problems</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Table -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-table"></i> Detailed Results
+                            <small class="text-muted">Click any row to view details</small>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="resultsTable">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Task ID</th>
+                                        <th>Model</th>
+                                        <th>Strategy</th>
+                                        <th>Sample</th>
+                                        <th>Status</th>
+                                        <th>Result</th>
+                                        <th>Execution Source</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for result in results %}
+                                    <tr class="problem-card" onclick="showResultDetails('{{ result.task_id }}', '{{ result.model }}', {{ result.sample_id }})">
+                                        <td>
+                                            <code>{{ result.task_id }}</code>
+                                        </td>
+                                        <td>
+                                            <strong>{{ result.model }}</strong>
+                                        </td>
+                                        <td>{{ result.strategy }}</td>
+                                        <td>#{{ result.sample_id }}</td>
+                                        <td>
+                                            {% if result.passed %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check"></i> Passed
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-danger">
+                                                    <i class="fas fa-times"></i> Failed
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <small>{{ result.result|truncate(50) }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ result.get('source', 'unknown') }}</span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary" 
+                                                    onclick="event.stopPropagation(); showResultDetails('{{ result.task_id }}', '{{ result.model }}', {{ result.sample_id }})">
+                                                <i class="fas fa-eye"></i> View
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- No Results Message -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-clipboard-list fa-4x text-muted mb-3"></i>
+                        <h4>No Evaluation Results Available</h4>
+                        <p class="text-muted mb-4">
+                            Run the AI model evaluation first to generate results.
+                        </p>
+                        <a href="/" class="btn btn-primary">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Results Details Modal -->
+        <div class="modal fade" id="resultDetailsModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalTitle">Result Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="modalBody">
+                        <!-- Dynamic content will be loaded here -->
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" onclick="copyResultDetails()">
+                            <i class="fas fa-copy"></i> Copy Details
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Section -->
+        {% if results %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-download"></i> Export Options
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Export the evaluation results for further analysis.</p>
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <button class="btn btn-success w-100" onclick="exportResultsCSV()">
+                                    <i class="fas fa-file-csv"></i> Export as CSV
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <button class="btn btn-primary w-100" onclick="exportResultsJSON()">
+                                    <i class="fas fa-file-code"></i> Export as JSON
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <button class="btn btn-warning w-100" onclick="printResults()">
+                                    <i class="fas fa-print"></i> Print Results
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <a href="/model_comparison" class="btn btn-info w-100">
+                                    <i class="fas fa-chart-bar"></i> View Comparison
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light mt-5 py-4">
+        <div class="container text-center">
+            <p class="mb-0">AI ModelEval - Evaluation Results Dashboard</p>
+            <small>Showing {{ results|length if results else 0 }} evaluation results</small>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+
+================================================================================
 FILE: dashboard\templates\index.html
 PATH: dashboard\templates\index.html
 ================================================================================
@@ -1417,6 +3969,13 @@ PATH: dashboard\templates\index.html
                                         {% else %}
                                             <span class="badge bg-secondary">N/A</span>
                                         {% endif %}
+                                    </td>
+                                    <td>
+                                        <code class="text-primary">{{ problem.problem_id }}</code>
+                                        <br>
+                                        <a href='/comparison/{{ problem.problem_id.split("/")[1] }}' class="btn btn-sm btn-outline-primary mt-1">
+                                            <i class="fas fa-code-compare"></i> Compare
+                                        </a>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -1928,6 +4487,532 @@ function testAPI() {
 }
 </script>
 {% endblock %}
+
+================================================================================
+FILE: dashboard\templates\model_comparison.html
+PATH: dashboard\templates\model_comparison.html
+================================================================================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Comparison - AI ModelEval</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-robot"></i> AI ModelEval
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/model_comparison">
+                            <i class="fas fa-chart-bar"></i> Model Comparison
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/evaluation_results">
+                            <i class="fas fa-list"></i> Evaluation Results
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1 class="display-4">
+                    <i class="fas fa-chart-bar text-primary"></i> Model Comparison
+                </h1>
+                <p class="lead text-muted">
+                    Detailed comparison of AI code generation models
+                </p>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+                        <li class="breadcrumb-item active">Model Comparison</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Filter and Controls -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-filter"></i> Filter Options
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Sort By:</label>
+                                <select id="sortBy" class="form-select" onchange="sortTable()">
+                                    <option value="pass_rate">Pass Rate (High to Low)</option>
+                                    <option value="pass_rate_asc">Pass Rate (Low to High)</option>
+                                    <option value="pass@1">Pass@1 (High to Low)</option>
+                                    <option value="total_tests">Total Tests</option>
+                                    <option value="model_name">Model Name</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Search Models:</label>
+                                <input type="text" id="searchInput" class="form-control" 
+                                       placeholder="Search model names..." onkeyup="searchTable()">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Actions:</label>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-primary" onclick="refreshCharts()">
+                                        <i class="fas fa-sync-alt"></i> Refresh Charts
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Comparison Table -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-table"></i> Detailed Model Performance
+                            <span class="badge bg-info ms-2">{{ models|length }} Models</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if models %}
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="comparisonTable">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Model</th>
+                                        <th>Pass Rate</th>
+                                        <th>Pass@1</th>
+                                        <th>Pass@5</th>
+                                        <th>Total Tests</th>
+                                        <th>Passed Tests</th>
+                                        <th>Failed Tests</th>
+                                        <th>Success Rate</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for model in models %}
+                                    {% set success_rate = (model.passed_tests / model.total_tests * 100) if model.total_tests > 0 else 0 %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ model.model }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ model.get('description', 'Code generation model') }}</small>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="progress flex-grow-1" style="height: 20px;">
+                                                    <div class="progress-bar 
+                                                        {% if model.pass_rate > 0.7 %}bg-success
+                                                        {% elif model.pass_rate > 0.4 %}bg-warning
+                                                        {% else %}bg-danger{% endif %}" 
+                                                        style="width: {{ model.pass_rate * 100 }}%">
+                                                    </div>
+                                                </div>
+                                                <span class="ms-2">{{ (model.pass_rate * 100)|round(1) }}%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge 
+                                                {% if model.get('pass@1', 0) > 0.7 %}bg-success
+                                                {% elif model.get('pass@1', 0) > 0.4 %}bg-warning
+                                                {% else %}bg-danger{% endif %}">
+                                                {{ (model.get('pass@1', 0) * 100)|round(1) }}%
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge 
+                                                {% if model.get('pass@5', 0) > 0.7 %}bg-success
+                                                {% elif model.get('pass@5', 0) > 0.4 %}bg-warning
+                                                {% else %}bg-danger{% endif %}">
+                                                {{ (model.get('pass@5', 0) * 100)|round(1) }}%
+                                            </span>
+                                        </td>
+                                        <td>{{ model.total_tests }}</td>
+                                        <td>
+                                            <span class="badge bg-success">{{ model.passed_tests }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-danger">{{ model.total_tests - model.passed_tests }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="progress flex-grow-1" style="height: 10px;">
+                                                    <div class="progress-bar 
+                                                        {% if success_rate > 70 %}bg-success
+                                                        {% elif success_rate > 40 %}bg-warning
+                                                        {% else %}bg-danger{% endif %}" 
+                                                        style="width: {{ success_rate }}%">
+                                                    </div>
+                                                </div>
+                                                <span class="ms-2">{{ success_rate|round(1) }}%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <a href="/evaluation_results?model={{ model.model|urlencode }}" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i> View Details
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-chart-bar fa-4x text-muted mb-3"></i>
+                            <h4>No Model Comparison Data Available</h4>
+                            <p class="text-muted">Run the AI model evaluation first to generate comparison data.</p>
+                            <a href="/" class="btn btn-primary">
+                                <i class="fas fa-arrow-left"></i> Back to Dashboard
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Charts -->
+        {% if models %}
+        <div class="row mb-4">
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-pie"></i> Model Performance Distribution
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="performanceChart" style="height: 400px;">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-spinner fa-spin me-2"></i> Loading performance chart...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-trophy"></i> Top Performers
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="topPerformersChart" style="height: 400px;">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-spinner fa-spin me-2"></i> Loading top performers chart...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Summary -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-calculator"></i> Statistics Summary
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title text-muted">Average Pass Rate</h6>
+                                        <h3 class="text-primary">
+                                            {% set avg_pass_rate = (models|map(attribute='pass_rate')|sum / models|length * 100) %}
+                                            {{ avg_pass_rate|round(1) }}%
+                                        </h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title text-muted">Best Model</h6>
+                                        <h5 class="text-success">
+                                            {% set best_model = models|sort(attribute='pass_rate', reverse=true)|first %}
+                                            {{ best_model.model }}
+                                        </h5>
+                                        <small>{{ (best_model.pass_rate * 100)|round(1) }}% Pass Rate</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title text-muted">Total Tests Run</h6>
+                                        <h3 class="text-info">
+                                            {{ models|sum(attribute='total_tests') }}
+                                        </h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title text-muted">Overall Success</h6>
+                                        <h3 class="text-warning">
+                                            {% set total_passed = models|sum(attribute='passed_tests') %}
+                                            {% set total_tests = models|sum(attribute='total_tests') %}
+                                            {% set overall_success = (total_passed / total_tests * 100) if total_tests > 0 else 0 %}
+                                            {{ overall_success|round(1) }}%
+                                        </h3>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Export Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-download"></i> Export Data
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Export the model comparison data for further analysis.</p>
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <button class="btn btn-success w-100" onclick="exportCSV()">
+                                    <i class="fas fa-file-csv"></i> Export as CSV
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <button class="btn btn-primary w-100" onclick="exportJSON()">
+                                    <i class="fas fa-file-code"></i> Export as JSON
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <button class="btn btn-warning w-100" onclick="printTable()">
+                                    <i class="fas fa-print"></i> Print Table
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <a href="/" class="btn btn-secondary w-100">
+                                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light mt-5 py-4">
+        <div class="container text-center">
+            <p class="mb-0">AI ModelEval - Model Comparison Dashboard</p>
+            <small>Analyzing {{ models|length }} AI models on HumanEval benchmark</small>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        {% if models %}
+        // Initialize charts when page is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            loadComparisonCharts();
+        });
+
+        function loadComparisonCharts() {
+            // Prepare data for charts
+            const modelNames = {{ models|map(attribute='model')|list|tojson }};
+            const passRates = {{ models|map(attribute='pass_rate')|list|tojson }};
+            const passAt1 = {{ models|map(attribute='pass@1')|list|tojson }};
+            
+            // Performance Distribution Chart
+            const performanceTrace = {
+                x: modelNames,
+                y: passRates,
+                type: 'bar',
+                name: 'Pass Rate',
+                marker: {
+                    color: passRates.map(rate => 
+                        rate > 0.7 ? '#27ae60' : 
+                        rate > 0.4 ? '#f39c12' : '#e74c3c'
+                    )
+                }
+            };
+
+            const performanceLayout = {
+                title: 'Model Pass Rate Distribution',
+                xaxis: { title: 'Model', tickangle: -45 },
+                yaxis: { 
+                    title: 'Pass Rate', 
+                    tickformat: ',.0%',
+                    range: [0, 1]
+                },
+                height: 400,
+                margin: { b: 100 }
+            };
+
+            Plotly.newPlot('performanceChart', [performanceTrace], performanceLayout);
+
+            // Top Performers Chart (Top 5)
+            const sortedModels = [...modelNames]
+                .map((name, index) => ({ name, rate: passRates[index] }))
+                .sort((a, b) => b.rate - a.rate)
+                .slice(0, 5);
+
+            const topPerformersTrace = {
+                x: sortedModels.map(m => m.name),
+                y: sortedModels.map(m => m.rate),
+                type: 'bar',
+                name: 'Top Performers',
+                marker: { 
+                    color: '#3498db',
+                    opacity: 0.8
+                }
+            };
+
+            const topPerformersLayout = {
+                title: 'Top 5 Performing Models',
+                xaxis: { title: 'Model' },
+                yaxis: { 
+                    title: 'Pass Rate', 
+                    tickformat: ',.0%',
+                    range: [0, 1]
+                },
+                height: 400
+            };
+
+            Plotly.newPlot('topPerformersChart', [topPerformersTrace], topPerformersLayout);
+        }
+
+        function refreshCharts() {
+            document.getElementById('performanceChart').innerHTML = 
+                '<div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin me-2"></i> Refreshing...</div>';
+            document.getElementById('topPerformersChart').innerHTML = 
+                '<div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin me-2"></i> Refreshing...</div>';
+            
+            setTimeout(loadComparisonCharts, 500);
+        }
+        {% endif %}
+
+        // Table Sorting
+        function sortTable() {
+            const sortBy = document.getElementById('sortBy').value;
+            const table = document.getElementById('comparisonTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            rows.sort((a, b) => {
+                let aValue, bValue;
+                
+                switch(sortBy) {
+                    case 'pass_rate':
+                        aValue = parseFloat(a.cells[1].querySelector('span').textContent);
+                        bValue = parseFloat(b.cells[1].querySelector('span').textContent);
+                        return bValue - aValue;
+                    case 'pass_rate_asc':
+                        aValue = parseFloat(a.cells[1].querySelector('span').textContent);
+                        bValue = parseFloat(b.cells[1].querySelector('span').textContent);
+                        return aValue - bValue;
+                    case 'pass@1':
+                        aValue = parseFloat(a.cells[2].querySelector('.badge').textContent);
+                        bValue = parseFloat(b.cells[2].querySelector('.badge').textContent);
+                        return bValue - aValue;
+                    case 'total_tests':
+                        aValue = parseInt(a.cells[4].textContent);
+                        bValue = parseInt(b.cells[4].textContent);
+                        return bValue - aValue;
+                    case 'model_name':
+                        aValue = a.cells[0].querySelector('strong').textContent.toLowerCase();
+                        bValue = b.cells[0].querySelector('strong').textContent.toLowerCase();
+                        return aValue.localeCompare(bValue);
+                    default:
+                        return 0;
+                }
+            });
+            
+            // Reappend rows in sorted order
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Table Search
+        function searchTable() {
+            const input = document.getElementById('searchInput').value.toLowerCase();
+            const table = document.getElementById('comparisonTable');
+            const rows = table.querySelectorAll('tbody tr');
+            
+            rows.forEach(row => {
+                const modelName = row.cells[0].querySelector('strong').textContent.toLowerCase();
+                row.style.display = modelName.includes(input) ? '' : 'none';
+            });
+        }
+
+        // Export Functions
+        function exportCSV() {
+            alert('CSV export would download model comparison data as CSV file');
+            // In real implementation: window.location.href = '/api/export/csv';
+        }
+
+        function exportJSON() {
+            alert('JSON export would download model comparison data as JSON file');
+            // In real implementation: window.location.href = '/api/export/json';
+        }
+
+        function printTable() {
+            window.print();
+        }
+    </script>
+</body>
+</html>
 
 ================================================================================
 FILE: dashboard\templates\problem_detail.html
@@ -2688,6 +5773,75 @@ PATH: data\human_eval_repo\human_eval\__init__.py
 
 
 ================================================================================
+FILE: results\baseline_summary.txt
+PATH: results\baseline_summary.txt
+================================================================================
+
+Human Baseline Metrics Summary
+========================================
+Platform: win32
+Total problems: 164
+Successful analyses: 164
+Failed analyses: 0
+Success rate: 100.0%
+
+loc:
+  Mean: 21.49
+  Std:  8.55
+  Min:  9.00
+  Max:  59.00
+
+lloc:
+  Mean: 8.70
+  Std:  4.89
+  Min:  3.00
+  Max:  31.00
+
+comments:
+  Mean: 0.02
+  Std:  0.17
+  Min:  0.00
+  Max:  2.00
+
+cyclomatic_complexity:
+  Mean: 3.61
+  Std:  2.29
+  Min:  1.00
+  Max:  15.00
+
+maintainability_index:
+  Mean: 82.53
+  Std:  14.82
+  Min:  38.63
+  Max:  100.00
+
+cognitive_complexity:
+  Mean: 4.99
+  Std:  5.82
+  Min:  0.00
+  Max:  52.00
+
+pylint_errors:
+  Mean: 0.00
+  Std:  0.00
+  Min:  0.00
+  Max:  0.00
+
+pylint_warnings:
+  Mean: 0.00
+  Std:  0.00
+  Min:  0.00
+  Max:  0.00
+
+security_issues:
+  Mean: 0.02
+  Std:  0.13
+  Min:  0.00
+  Max:  1.00
+
+
+
+================================================================================
 FILE: results\baseline\baseline_summary.txt
 PATH: results\baseline\baseline_summary.txt
 ================================================================================
@@ -2754,6 +5908,386 @@ security_issues:
   Min:  0.00
   Max:  1.00
 
+
+
+================================================================================
+FILE: results\individual_solutions\codellama_7b\zero_shot\HumanEval_0\sample_0.py
+PATH: results\individual_solutions\codellama_7b\zero_shot\HumanEval_0\sample_0.py
+================================================================================
+
+"""
+AI Generated Solution
+Task ID: HumanEval/0
+Model: codellama:7b
+Strategy: zero_shot
+Sample ID: 0
+Generated: 2025-12-21T12:12:50.193443
+"""
+
+def has_close_elements(numbers, threshold):
+    for i in range(len(numbers) - 1):
+        for j in range(i + 1, len(numbers)):
+            if abs(numbers[j] - numbers[i]) < threshold:
+                return True
+    return False
+
+================================================================================
+FILE: results\individual_solutions\codellama_7b\zero_shot\HumanEval_0\sample_1.py
+PATH: results\individual_solutions\codellama_7b\zero_shot\HumanEval_0\sample_1.py
+================================================================================
+
+"""
+AI Generated Solution
+Task ID: HumanEval/0
+Model: codellama:7b
+Strategy: zero_shot
+Sample ID: 1
+Generated: 2025-12-21T12:12:50.195949
+"""
+
+def has_close_elements(numbers, threshold):
+    for i in range(len(numbers)-1):
+        for j in range(i+1, len(numbers)):
+            if abs(numbers[i]-numbers[j]) < threshold:
+                return True
+    return False
+
+================================================================================
+FILE: results\individual_solutions\codellama_7b\zero_shot\HumanEval_0\test_sample_0.py
+PATH: results\individual_solutions\codellama_7b\zero_shot\HumanEval_0\test_sample_0.py
+================================================================================
+
+"""
+Test for AI Generated Solution
+Task ID: HumanEval/0
+Model: codellama:7b
+"""
+
+def has_close_elements(numbers, threshold):
+    for i in range(len(numbers) - 1):
+        for j in range(i + 1, len(numbers)):
+            if abs(numbers[j] - numbers[i]) < threshold:
+                return True
+    return False
+
+
+
+METADATA = {
+    'author': 'jt',
+    'dataset': 'test'
+}
+
+
+def check(candidate):
+    assert candidate([1.0, 2.0, 3.9, 4.0, 5.0, 2.2], 0.3) == True
+    assert candidate([1.0, 2.0, 3.9, 4.0, 5.0, 2.2], 0.05) == False
+    assert candidate([1.0, 2.0, 5.9, 4.0, 5.0], 0.95) == True
+    assert candidate([1.0, 2.0, 5.9, 4.0, 5.0], 0.8) == False
+    assert candidate([1.0, 2.0, 3.0, 4.0, 5.0, 2.0], 0.1) == True
+    assert candidate([1.1, 2.2, 3.1, 4.1, 5.1], 1.0) == True
+    assert candidate([1.1, 2.2, 3.1, 4.1, 5.1], 0.5) == False
+
+
+
+================================================================================
+FILE: results\individual_solutions\codellama_7b\zero_shot\HumanEval_0\test_sample_1.py
+PATH: results\individual_solutions\codellama_7b\zero_shot\HumanEval_0\test_sample_1.py
+================================================================================
+
+"""
+Test for AI Generated Solution
+Task ID: HumanEval/0
+Model: codellama:7b
+"""
+
+def has_close_elements(numbers, threshold):
+    for i in range(len(numbers)-1):
+        for j in range(i+1, len(numbers)):
+            if abs(numbers[i]-numbers[j]) < threshold:
+                return True
+    return False
+
+
+
+METADATA = {
+    'author': 'jt',
+    'dataset': 'test'
+}
+
+
+def check(candidate):
+    assert candidate([1.0, 2.0, 3.9, 4.0, 5.0, 2.2], 0.3) == True
+    assert candidate([1.0, 2.0, 3.9, 4.0, 5.0, 2.2], 0.05) == False
+    assert candidate([1.0, 2.0, 5.9, 4.0, 5.0], 0.95) == True
+    assert candidate([1.0, 2.0, 5.9, 4.0, 5.0], 0.8) == False
+    assert candidate([1.0, 2.0, 3.0, 4.0, 5.0, 2.0], 0.1) == True
+    assert candidate([1.1, 2.2, 3.1, 4.1, 5.1], 1.0) == True
+    assert candidate([1.1, 2.2, 3.1, 4.1, 5.1], 0.5) == False
+
+
+
+================================================================================
+FILE: results\individual_solutions\codellama_7b\zero_shot\HumanEval_1\sample_0.py
+PATH: results\individual_solutions\codellama_7b\zero_shot\HumanEval_1\sample_0.py
+================================================================================
+
+"""
+AI Generated Solution
+Task ID: HumanEval/1
+Model: codellama:7b
+Strategy: zero_shot
+Sample ID: 0
+Generated: 2025-12-21T12:12:50.197960
+"""
+
+def separate_paren_groups(paren_string):
+    stack = []
+    result = []
+    for char in paren_string:
+        if char == "(":
+            stack.append(char)
+        elif char == ")":
+            top = stack.pop()
+            while top != "(":
+                result.append(top)
+                top = stack.pop()
+    return ["".join(result)] + [stack.pop() for _ in range(len(stack))]
+
+
+if __name__ == "__main__":
+    print(separate_paren_groups("( ) (( )) (( )( ))"))
+
+================================================================================
+FILE: results\individual_solutions\codellama_7b\zero_shot\HumanEval_1\sample_1.py
+PATH: results\individual_solutions\codellama_7b\zero_shot\HumanEval_1\sample_1.py
+================================================================================
+
+"""
+AI Generated Solution
+Task ID: HumanEval/1
+Model: codellama:7b
+Strategy: zero_shot
+Sample ID: 1
+Generated: 2025-12-21T12:12:50.202960
+"""
+
+def separate_paren_groups(paren_string):
+    # Create an empty list to store the separated groups
+    separated_groups = []
+
+    # Iterate through the characters in the input string
+    for char in paren_string:
+        # If the current character is an opening parenthesis, add it to the current group
+        if char == '(':
+            current_group += char
+        # If the current character is a closing parenthesis, add it to the current group and append the group to the list of separated groups
+        elif char == ')':
+            current_group += char
+            separated_groups.append(current_group)
+            current_group = ''
+        # If the current character is a space, ignore it (spaces are ignored in the input string)
+        elif char == ' ':
+            continue
+        # If the current character is anything else, it is an error and should be handled accordingly
+        else:
+            raise ValueError('Invalid character in input string')
+
+    # Return the list of separated groups
+    return separated_groups
+
+================================================================================
+FILE: results\individual_solutions\codellama_7b\zero_shot\HumanEval_1\test_sample_0.py
+PATH: results\individual_solutions\codellama_7b\zero_shot\HumanEval_1\test_sample_0.py
+================================================================================
+
+"""
+Test for AI Generated Solution
+Task ID: HumanEval/1
+Model: codellama:7b
+"""
+
+def separate_paren_groups(paren_string):
+    stack = []
+    result = []
+    for char in paren_string:
+        if char == "(":
+            stack.append(char)
+        elif char == ")":
+            top = stack.pop()
+            while top != "(":
+                result.append(top)
+                top = stack.pop()
+    return ["".join(result)] + [stack.pop() for _ in range(len(stack))]
+
+
+if __name__ == "__main__":
+    print(separate_paren_groups("( ) (( )) (( )( ))"))
+
+
+
+METADATA = {
+    'author': 'jt',
+    'dataset': 'test'
+}
+
+
+def check(candidate):
+    assert candidate('(()()) ((())) () ((())()())') == [
+        '(()())', '((()))', '()', '((())()())'
+    ]
+    assert candidate('() (()) ((())) (((())))') == [
+        '()', '(())', '((()))', '(((())))'
+    ]
+    assert candidate('(()(())((())))') == [
+        '(()(())((())))'
+    ]
+    assert candidate('( ) (( )) (( )( ))') == ['()', '(())', '(()())']
+
+
+================================================================================
+FILE: results\individual_solutions\codellama_7b\zero_shot\HumanEval_1\test_sample_1.py
+PATH: results\individual_solutions\codellama_7b\zero_shot\HumanEval_1\test_sample_1.py
+================================================================================
+
+"""
+Test for AI Generated Solution
+Task ID: HumanEval/1
+Model: codellama:7b
+"""
+
+def separate_paren_groups(paren_string):
+    # Create an empty list to store the separated groups
+    separated_groups = []
+
+    # Iterate through the characters in the input string
+    for char in paren_string:
+        # If the current character is an opening parenthesis, add it to the current group
+        if char == '(':
+            current_group += char
+        # If the current character is a closing parenthesis, add it to the current group and append the group to the list of separated groups
+        elif char == ')':
+            current_group += char
+            separated_groups.append(current_group)
+            current_group = ''
+        # If the current character is a space, ignore it (spaces are ignored in the input string)
+        elif char == ' ':
+            continue
+        # If the current character is anything else, it is an error and should be handled accordingly
+        else:
+            raise ValueError('Invalid character in input string')
+
+    # Return the list of separated groups
+    return separated_groups
+
+
+
+METADATA = {
+    'author': 'jt',
+    'dataset': 'test'
+}
+
+
+def check(candidate):
+    assert candidate('(()()) ((())) () ((())()())') == [
+        '(()())', '((()))', '()', '((())()())'
+    ]
+    assert candidate('() (()) ((())) (((())))') == [
+        '()', '(())', '((()))', '(((())))'
+    ]
+    assert candidate('(()(())((())))') == [
+        '(()(())((())))'
+    ]
+    assert candidate('( ) (( )) (( )( ))') == ['()', '(())', '(()())']
+
+
+================================================================================
+FILE: results\individual_solutions\codellama_7b\zero_shot\HumanEval_2\sample_0.py
+PATH: results\individual_solutions\codellama_7b\zero_shot\HumanEval_2\sample_0.py
+================================================================================
+
+"""
+AI Generated Solution
+Task ID: HumanEval/2
+Model: codellama:7b
+Strategy: zero_shot
+Sample ID: 0
+Generated: 2025-12-21T12:12:50.205484
+"""
+
+def truncate_number(number):
+    return abs(number - int(number))
+
+================================================================================
+FILE: results\individual_solutions\codellama_7b\zero_shot\HumanEval_2\sample_1.py
+PATH: results\individual_solutions\codellama_7b\zero_shot\HumanEval_2\sample_1.py
+================================================================================
+
+"""
+AI Generated Solution
+Task ID: HumanEval/2
+Model: codellama:7b
+Strategy: zero_shot
+Sample ID: 1
+Generated: 2025-12-21T12:12:50.206508
+"""
+
+def truncate_number(number):
+    return abs(number - int(number))
+
+================================================================================
+FILE: results\individual_solutions\codellama_7b\zero_shot\HumanEval_2\test_sample_0.py
+PATH: results\individual_solutions\codellama_7b\zero_shot\HumanEval_2\test_sample_0.py
+================================================================================
+
+"""
+Test for AI Generated Solution
+Task ID: HumanEval/2
+Model: codellama:7b
+"""
+
+def truncate_number(number):
+    return abs(number - int(number))
+
+
+
+METADATA = {
+    'author': 'jt',
+    'dataset': 'test'
+}
+
+
+def check(candidate):
+    assert candidate(3.5) == 0.5
+    assert abs(candidate(1.33) - 0.33) < 1e-6
+    assert abs(candidate(123.456) - 0.456) < 1e-6
+
+
+================================================================================
+FILE: results\individual_solutions\codellama_7b\zero_shot\HumanEval_2\test_sample_1.py
+PATH: results\individual_solutions\codellama_7b\zero_shot\HumanEval_2\test_sample_1.py
+================================================================================
+
+"""
+Test for AI Generated Solution
+Task ID: HumanEval/2
+Model: codellama:7b
+"""
+
+def truncate_number(number):
+    return abs(number - int(number))
+
+
+
+METADATA = {
+    'author': 'jt',
+    'dataset': 'test'
+}
+
+
+def check(candidate):
+    assert candidate(3.5) == 0.5
+    assert abs(candidate(1.33) - 0.33) < 1e-6
+    assert abs(candidate(123.456) - 0.456) < 1e-6
 
 
 ================================================================================
@@ -3168,6 +6702,562 @@ class HumanEvalLoader:
 
 
 ================================================================================
+FILE: src\evaluation_layer\init.py
+PATH: src\evaluation_layer\init.py
+================================================================================
+
+from .sandbox_executor import SandboxExecutor
+from .metrics_calculator import MetricsCalculator
+
+__all__ = ['SandboxExecutor', 'MetricsCalculator']
+
+================================================================================
+FILE: src\evaluation_layer\metrics_calculator.py
+PATH: src\evaluation_layer\metrics_calculator.py
+================================================================================
+
+import pandas as pd
+import numpy as np
+from typing import List, Dict
+import logging
+
+logger = logging.getLogger(__name__)
+
+class MetricsCalculator:
+    def __init__(self):
+        pass
+    
+    def calculate_pass_at_k(self, results_df: pd.DataFrame, k_values: List[int] = [1, 5, 10]) -> Dict:
+        """Calculate pass@k metrics from the paper"""
+        metrics = {}
+        
+        for k in k_values:
+            pass_at_k = self._estimate_pass_at_k(results_df, k)
+            metrics[f'pass@{k}'] = pass_at_k
+        
+        return metrics
+    
+    def _estimate_pass_at_k(self, results_df: pd.DataFrame, k: int) -> float:
+        """Estimate pass@k using unbiased estimator"""
+        # Group by problem and model
+        grouped = results_df.groupby(['task_id', 'model'])
+        
+        pass_rates = []
+        
+        for (task_id, model), group in grouped:
+            # Get all samples for this problem-model combination
+            samples = group['passed'].tolist()
+            n = len(samples)
+            c = sum(samples)
+            
+            if n < k:
+                continue  # Not enough samples
+            
+            # Calculate pass@k using unbiased estimator
+            if n - c < k:
+                pass_rate = 1.0
+            else:
+                pass_rate = 1.0 - np.prod(1.0 - k / np.arange(n - c + 1, n + 1))
+            
+            pass_rates.append(pass_rate)
+        
+        return np.mean(pass_rates) if pass_rates else 0.0
+    
+    def calculate_aggregate_score(self, functional_scores: Dict, static_scores: pd.DataFrame) -> float:
+        """Calculate aggregate performance score"""
+        # Weight functional correctness higher
+        functional_weight = 0.7
+        static_weight = 0.3
+        
+        # Normalize functional scores (pass@1 as primary metric)
+        functional_normalized = functional_scores.get('pass@1', 0)
+        
+        # Calculate static quality score (average of normalized metrics)
+        if not static_scores.empty:
+            maintainability_norm = static_scores['maintainability_index'].mean() / 100
+            complexity_norm = 1 - (static_scores['cyclomatic_complexity'].mean() / 20)  # Normalize
+            static_normalized = (maintainability_norm + complexity_norm) / 2
+        else:
+            static_normalized = 0
+        
+        aggregate_score = (functional_normalized * functional_weight + 
+                          static_normalized * static_weight)
+        
+        return aggregate_score
+    
+    def generate_comparison_report(self, results_df: pd.DataFrame) -> pd.DataFrame:
+        """Generate comparative report across models"""
+        report_data = []
+        
+        for model in results_df['model'].unique():
+            model_results = results_df[results_df['model'] == model]
+            
+            # Calculate metrics
+            total_tests = len(model_results)
+            passed_tests = model_results['passed'].sum()
+            pass_rate = passed_tests / total_tests if total_tests > 0 else 0
+            
+            # Calculate pass@k for this model
+            model_pass_at_k = self.calculate_pass_at_k(model_results, [1, 5])
+            
+            report_data.append({
+                'model': model,
+                'total_tests': total_tests,
+                'passed_tests': passed_tests,
+                'pass_rate': pass_rate,
+                'pass@1': model_pass_at_k.get('pass@1', 0),
+                'pass@5': model_pass_at_k.get('pass@5', 0),
+                'avg_execution_time': model_results.get('execution_time', pd.Series([0])).mean()
+            })
+        
+        return pd.DataFrame(report_data)
+
+================================================================================
+FILE: src\evaluation_layer\sandbox_executor.py
+PATH: src\evaluation_layer\sandbox_executor.py
+================================================================================
+
+import docker
+import logging
+import os
+import tempfile
+import textwrap
+from typing import Dict
+
+logger = logging.getLogger(__name__)
+
+class SandboxExecutor:
+    def __init__(self, timeout: int = 30):
+        self.timeout = timeout
+        self.client = None
+        self.setup_docker()
+    
+    def setup_docker(self):
+        """Initialize Docker client"""
+        try:
+            self.client = docker.from_env()
+            logger.info("Docker client initialized")
+        except Exception as e:
+            logger.warning(f"Docker not available: {e}. Using fallback execution.")
+            self.client = None
+    
+    def execute_safely(self, code: str, tests: str, problem_id: str) -> Dict:
+        """Execute code in a safe environment and return results"""
+        if self.client:
+            return self._execute_with_docker(code, tests, problem_id)
+        return self._execute_with_fallback(code, tests, problem_id)
+    
+    def _execute_with_docker(self, code: str, tests: str, problem_id: str) -> Dict:
+        """Execute using a Docker container for safety"""
+        temp_file = None
+        try:
+            # Create complete test program (inner f-strings are escaped)
+            test_program = textwrap.dedent(f"""
+            {code}
+            
+            {tests}
+            
+            # Run the test
+            try:
+                check({problem_id.split('/')[-1]})
+                print("RESULT: PASSED")
+            except AssertionError as e:
+                print(f"RESULT: FAILED: {{e}}")
+            except Exception as e:
+                print(f"RESULT: ERROR: {{e}}")
+            """)
+
+            # Write to temporary file
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+                f.write(test_program)
+                temp_file = f.name
+
+            # Run in container
+            output_bytes = self.client.containers.run(
+                "python:3.9-slim",
+                "python /tmp/test.py",
+                volumes={temp_file: {"bind": "/tmp/test.py", "mode": "ro"}},
+                working_dir="/tmp",
+                stderr=True,
+                stdout=True,
+                remove=True,
+                timeout=self.timeout,
+            )
+
+            output = output_bytes.decode("utf-8") if output_bytes else ""
+            passed = "RESULT: PASSED" in output
+
+            return {
+                "passed": passed,
+                "result": "passed" if passed else "failed",
+                "output": output,
+            }
+
+        except Exception as e:
+            return {"passed": False, "result": f"error: {e}", "output": str(e)}
+        finally:
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.unlink(temp_file)
+                except Exception:
+                    pass
+    
+    def _execute_with_fallback(self, code: str, tests: str, problem_id: str) -> Dict:
+        """Fallback execution without Docker (less safe)"""
+        try:
+            exec_globals = {}
+            exec(code, exec_globals)
+            
+            test_code = textwrap.dedent(f"""
+            {tests}
+            
+            try:
+                check({problem_id.split('/')[-1]})
+                result = "passed"
+            except AssertionError:
+                result = "failed"
+            except Exception as e:
+                result = f"error: {{e}}"
+            """)
+            exec(test_code, exec_globals)
+            
+            return {
+                "passed": exec_globals.get("result") == "passed",
+                "result": exec_globals.get("result", "unknown"),
+                "output": "Fallback execution completed",
+            }
+        except Exception as e:
+            return {"passed": False, "result": f"error: {e}", "output": str(e)}
+
+================================================================================
+FILE: src\model_layer\code_generator.py
+PATH: src\model_layer\code_generator.py
+================================================================================
+
+import pandas as pd
+from typing import List, Dict
+import logging
+from tqdm import tqdm
+import time
+
+logger = logging.getLogger(__name__)
+
+class CodeGenerator:
+    def __init__(self, model_manager, prompt_engine):
+        self.model_manager = model_manager
+        self.prompt_engine = prompt_engine
+    
+    def generate_solutions(self, problems: List[Dict], models: List[str], 
+                         num_samples: int = 5, strategies: List[str] = None) -> pd.DataFrame:
+        """Generate solutions for all problems with different models and strategies"""
+        if strategies is None:
+            strategies = ["zero_shot"]
+        
+        all_solutions = []
+        
+        for problem in tqdm(problems, desc="🔄 Processing problems"):
+            for model in models:
+                for strategy in strategies:
+                    for sample_idx in range(num_samples):
+                        try:
+                            # Format prompt
+                            prompt = self.prompt_engine.format_prompt(problem, strategy)
+                            
+                            # Generate code
+                            generated_code = self.model_manager.generate_code(prompt, model)
+                            
+                            # Store solution
+                            solution = {
+                                'task_id': problem['task_id'],
+                                'problem_id': problem['task_id'].split('/')[-1],
+                                'model': model,
+                                'strategy': strategy,
+                                'sample_id': sample_idx,
+                                'prompt': prompt,
+                                'generated_code': generated_code,
+                                'original_solution': problem.get('canonical_solution', ''),
+                                'tests': problem.get('test', '')
+                            }
+                            all_solutions.append(solution)
+                            
+                            # Small delay to avoid rate limits
+                            time.sleep(0.5)
+                            
+                        except Exception as e:
+                            logger.error(f"❌ Generation failed for {problem['task_id']}: {e}")
+                            # Add error entry
+                            all_solutions.append({
+                                'task_id': problem['task_id'],
+                                'problem_id': problem['task_id'].split('/')[-1],
+                                'model': model,
+                                'strategy': strategy,
+                                'sample_id': sample_idx,
+                                'prompt': '',
+                                'generated_code': f'# Generation error: {str(e)}',
+                                'original_solution': '',
+                                'tests': '',
+                                'error': str(e)
+                            })
+        
+        return pd.DataFrame(all_solutions)
+
+================================================================================
+FILE: src\model_layer\init.py
+PATH: src\model_layer\init.py
+================================================================================
+
+from .model_integration import ModelManager
+from .prompt_engine import PromptEngine
+from .code_generator import CodeGenerator
+
+__all__ = ['ModelManager', 'PromptEngine', 'CodeGenerator']
+
+================================================================================
+FILE: src\model_layer\model_adapters.py
+PATH: src\model_layer\model_adapters.py
+================================================================================
+
+
+
+================================================================================
+FILE: src\model_layer\model_integration.py
+PATH: src\model_layer\model_integration.py
+================================================================================
+
+import requests
+import ollama
+from huggingface_hub import InferenceClient
+import time
+from typing import List, Dict, Optional
+import logging
+
+logger = logging.getLogger(__name__)
+
+class ModelManager:
+    def __init__(self, config):
+        self.config = config
+        self.hf_client = None
+        self.ollama_client = None
+        self.setup_clients()
+    
+    def setup_clients(self):
+        """Initialize model clients"""
+        try:
+            # Setup Ollama
+            self.ollama_client = ollama.Client(
+                host=self.config.get("models.ollama_base_url", "http://localhost:11434")
+            )
+            logger.info("✅ Ollama client initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ Ollama client failed: {e}")
+        
+        # Setup HuggingFace (optional)
+        hf_key = self.config.get("models.hf_api_key")
+        if hf_key:
+            try:
+                self.hf_client = InferenceClient(token=hf_key)
+                logger.info("✅ HuggingFace client initialized")
+            except Exception as e:
+                logger.warning(f"⚠️ HuggingFace client failed: {e}")
+    
+    def get_available_models(self) -> List[str]:
+        """Get list of available models with updated Ollama API response handling"""
+        available_models = []
+    
+        # Check Ollama models
+        if self.ollama_client:
+            try:
+                response = self.ollama_client.list()
+                logger.debug(f"Ollama API response type: {type(response)}")
+            
+                #Debug: Print the actual response structure
+                if hasattr(response, '__dict__'):
+                    logger.debug(f"Response attributes: {response.__dict__}")
+            
+                # Handle different response structures
+                ollama_models = []
+            
+                # Method 1: Check if response has 'models' attribute (new Ollama version)
+                if hasattr(response, 'models'):
+                    models_list = response.models
+                    logger.debug(f"Using response.models, found {len(models_list)} models")
+                # Method 2: Check if response is a dictionary with 'models' key
+                elif isinstance(response, dict) and 'models' in response:
+                    models_list = response['models']
+                    logger.debug(f"Using response['models'], found {len(models_list)} models")
+                # Method 3: Response might be the list directly
+                elif isinstance(response, list):
+                    models_list = response
+                    logger.debug(f"Using response as list directly, found {len(models_list)} models")
+                else:
+                    logger.warning(f"Unexpected response structure: {response}")
+                    models_list = []
+            
+                # Extract model names from the list
+                for model in models_list:
+                    # Try different possible field names for model name
+                    model_name = None
+                
+                    if hasattr(model, 'name'):
+                        model_name = model.name
+                    elif hasattr(model, 'model'):
+                        model_name = model.model
+                    elif isinstance(model, dict):
+                        model_name = model.get('name') or model.get('model')
+                    elif isinstance(model, str):
+                        model_name = model
+                
+                    if model_name:
+                        ollama_models.append(model_name)
+                        logger.debug(f"Found model: {model_name}")
+                    else:
+                        logger.warning(f"Could not extract name from model object: {model}")
+            
+                available_models.extend(ollama_models)
+                logger.info(f"Found Ollama models: {ollama_models}")
+            
+            except Exception as e:
+                logger.error(f"Failed to get Ollama models: {e}")
+            
+                # Fallback: Try direct API call
+                try:
+                    logger.info("Attempting fallback API call...")
+                    ollama_url = self.config.get("models.ollama_base_url", "http://localhost:11434")
+                    response = requests.get(f"{ollama_url}/api/tags", timeout=10)
+                
+                    if response.status_code == 200:
+                        data = response.json()
+                        logger.debug(f"Fallback API response: {data}")
+                    
+                        if 'models' in data:
+                            fallback_models = []
+                            for model in data['models']:
+                                # Try different field names in the fallback
+                                model_name = model.get('name') or model.get('model')
+                                if model_name:
+                                    fallback_models.append(model_name)
+                        
+                            available_models.extend(fallback_models)
+                            logger.info(f"Fallback found models: {fallback_models}")
+                        else:
+                            logger.warning("No 'models' key in fallback response")
+                    else:
+                        logger.error(f"Fallback API call failed with status: {response.status_code}")
+                    
+                except Exception as fallback_error:
+                    logger.error(f"Fallback API call also failed: {fallback_error}")
+    
+        # If no models found via API, provide some common defaults
+        if not available_models:
+            logger.warning("No models detected via API, using common fallback models")
+            available_models = ["codellama:7b", "llama2:7b", "starcoder:1b"]
+            logger.info(f"Using fallback models: {available_models}")
+    
+        return available_models 
+       
+    def generate_with_ollama(self, prompt: str, model: str, max_tokens: int = 512) -> str:
+        """Generate code using Ollama"""
+        try:
+            response = self.ollama_client.generate(
+                model=model,
+                prompt=prompt,
+                options={
+                    'temperature': 0.7,
+                    'top_p': 0.9,
+                    'max_tokens': max_tokens
+                }
+            )
+            return response['response']
+        except Exception as e:
+            logger.error(f"❌ Ollama generation failed: {e}")
+            return f"# Generation failed: {str(e)}"
+    
+    def generate_with_huggingface(self, prompt: str, model: str) -> str:
+        """Generate code using HuggingFace (placeholder)"""
+        # This would require proper API setup
+        return f"# HuggingFace generation for {model} not yet implemented\n# Prompt: {prompt[:100]}..."
+    
+    def generate_code(self, prompt: str, model: str) -> str:
+        """Unified code generation interface"""
+        if model in [m for m in self.get_available_models()]:
+            return self.generate_with_ollama(prompt, model)
+        elif self.hf_client and "huggingface" in model:
+            return self.generate_with_huggingface(prompt, model)
+        else:
+            return f"# Model {model} not available"
+
+================================================================================
+FILE: src\model_layer\prompt_engine.py
+PATH: src\model_layer\prompt_engine.py
+================================================================================
+
+from typing import Dict, List
+import textwrap
+
+class PromptEngine:
+    def __init__(self):
+        self.strategies = {
+            "zero_shot": self._zero_shot_prompt,
+            "few_shot": self._few_shot_prompt,
+            "chain_of_thought": self._cot_prompt
+        }
+    
+    def _zero_shot_prompt(self, problem: Dict) -> str:
+        """Basic zero-shot prompt"""
+        prompt = f'''{problem["prompt"]}
+
+# Complete the function below:
+'''
+        return prompt
+    
+    def _few_shot_prompt(self, problem: Dict) -> str:
+        """Few-shot prompt with examples"""
+        examples = '''
+# Example 1:
+# Problem: Write a function to add two numbers
+# Solution:
+def add(a, b):
+    """Add two numbers and return the result."""
+    return a + b
+
+# Example 2:  
+# Problem: Write a function to check if a number is even
+# Solution:
+def is_even(n):
+    """Check if a number is even."""
+    return n % 2 == 0
+
+'''
+        prompt = f'''{examples}
+# Now solve this problem:
+{problem["prompt"]}
+
+# Complete the function below:
+'''
+        return prompt
+    
+    def _cot_prompt(self, problem: Dict) -> str:
+        """Chain-of-thought prompt"""
+        prompt = f'''{problem["prompt"]}
+
+# Let's think step by step. First, understand the problem and requirements.
+# Then, write the solution function:
+
+'''
+        return prompt
+    
+    def format_prompt(self, problem: Dict, strategy: str = "zero_shot") -> str:
+        """Format prompt using specified strategy"""
+        if strategy not in self.strategies:
+            strategy = "zero_shot"
+        
+        return self.strategies[strategy](problem)
+    
+    def get_available_strategies(self) -> List[str]:
+        """Get list of available prompt strategies"""
+        return list(self.strategies.keys())
+
+================================================================================
 SUMMARY
-Total files extracted: 26
+Total files extracted: 55
 ================================================================================

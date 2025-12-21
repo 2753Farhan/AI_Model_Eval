@@ -1,0 +1,130 @@
+2025-12-21 16:10:15,125 - INFO - [__main__] - AI Model Evaluation Starting...
+2025-12-21 16:10:15,126 - INFO - [__main__] - STARTING: Configuration Initialization
+2025-12-21 16:10:15,128 - INFO - [__main__] - Initializing system components...
+2025-12-21 16:10:15,136 - INFO - [model_layer.model_integration] - ✅ Ollama client initialized
+2025-12-21 16:10:15,140 - INFO - [evaluation_layer.sandbox_executor] - Docker client initialized
+2025-12-21 16:10:15,140 - INFO - [__main__] - All components initialized successfully
+2025-12-21 16:10:15,140 - INFO - [__main__] - COMPLETED: Configuration Initialization in 0.01s
+2025-12-21 16:10:15,141 - INFO - [__main__] - Starting evaluation with test configuration...
+2025-12-21 16:10:15,142 - INFO - [__main__] - Starting AI Model Evaluation Pipeline with Enhanced Debugging
+2025-12-21 16:10:15,142 - INFO - [__main__] - ============================================================
+2025-12-21 16:10:15,142 - INFO - [__main__] - Configuration: 1 models, 2 samples per task
+2025-12-21 16:10:15,142 - INFO - [__main__] - STARTING: Dataset Loading
+2025-12-21 16:10:15,143 - INFO - [__main__] - Loading HumanEval dataset...
+2025-12-21 16:10:15,156 - INFO - [__main__] - Loaded 164 problems
+2025-12-21 16:10:15,156 - INFO - [__main__] - COMPLETED: Dataset Loading in 0.01s
+2025-12-21 16:10:15,156 - INFO - [__main__] - STARTING: Model Detection and Validation
+2025-12-21 16:10:15,157 - INFO - [__main__] - Checking model availability...
+2025-12-21 16:10:17,256 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 16:10:17,258 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 16:10:17,258 - INFO - [__main__] - Available models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 16:10:17,258 - INFO - [__main__] - Final model selection: ['codellama:7b']
+2025-12-21 16:10:17,258 - INFO - [__main__] - COMPLETED: Model Detection and Validation in 2.10s
+2025-12-21 16:10:17,259 - INFO - [__main__] - STARTING: Code Generation
+2025-12-21 16:10:17,259 - INFO - [__main__] - Generating code solutions...
+2025-12-21 16:10:17,263 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 16:10:17,263 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 16:10:19,111 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 500 Internal Server Error"
+2025-12-21 16:10:19,111 - ERROR - [model_layer.model_integration] - ❌ Ollama generation failed: model requires more system memory (3.0 GiB) than is available (2.7 GiB) (status code: 500)
+2025-12-21 16:10:19,621 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 16:10:19,622 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 16:10:20,488 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 500 Internal Server Error"
+2025-12-21 16:10:20,489 - ERROR - [model_layer.model_integration] - ❌ Ollama generation failed: model requires more system memory (3.0 GiB) than is available (2.9 GiB) (status code: 500)
+2025-12-21 16:10:21,001 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 16:10:21,004 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 16:10:21,327 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 500 Internal Server Error"
+2025-12-21 16:10:21,327 - ERROR - [model_layer.model_integration] - ❌ Ollama generation failed: model requires more system memory (3.0 GiB) than is available (2.9 GiB) (status code: 500)
+2025-12-21 16:10:21,839 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 16:10:21,840 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 16:10:22,159 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 500 Internal Server Error"
+2025-12-21 16:10:22,159 - ERROR - [model_layer.model_integration] - ❌ Ollama generation failed: model requires more system memory (3.0 GiB) than is available (2.9 GiB) (status code: 500)
+2025-12-21 16:10:22,668 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 16:10:22,669 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 16:10:22,980 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 500 Internal Server Error"
+2025-12-21 16:10:22,981 - ERROR - [model_layer.model_integration] - ❌ Ollama generation failed: model requires more system memory (3.0 GiB) than is available (2.9 GiB) (status code: 500)
+2025-12-21 16:10:23,491 - INFO - [httpx] - HTTP Request: GET http://localhost:11434/api/tags "HTTP/1.1 200 OK"
+2025-12-21 16:10:23,492 - INFO - [model_layer.model_integration] - Found Ollama models: ['codellama:7b', 'deepseek-r1:1.5b', 'tinyllama:latest', 'qwen:1.8b', 'deepseek-r1:latest']
+2025-12-21 16:10:23,792 - INFO - [httpx] - HTTP Request: POST http://localhost:11434/api/generate "HTTP/1.1 500 Internal Server Error"
+2025-12-21 16:10:23,792 - ERROR - [model_layer.model_integration] - ❌ Ollama generation failed: model requires more system memory (3.0 GiB) than is available (2.9 GiB) (status code: 500)
+2025-12-21 16:10:24,299 - INFO - [__main__] - Generation results: 6 successful, 0 failed
+2025-12-21 16:10:24,299 - INFO - [__main__] - COMPLETED: Code Generation in 7.04s
+2025-12-21 16:10:24,306 - INFO - [__main__] - Saved solutions CSV to: results\generated_solutions.csv
+2025-12-21 16:10:24,306 - INFO - [__main__] - STARTING: Saving Individual Solution Files
+2025-12-21 16:10:24,307 - INFO - [__main__] - Creating directory structure in: results\individual_solutions
+2025-12-21 16:10:24,314 - INFO - [__main__] - Saved 12 individual files (0 errors)
+2025-12-21 16:10:24,314 - INFO - [__main__] - COMPLETED: Saving Individual Solution Files in 0.01s
+2025-12-21 16:10:24,314 - INFO - [__main__] - Individual solutions saved to: results\individual_solutions
+2025-12-21 16:10:24,315 - INFO - [__main__] - STARTING: Test Execution from Individual Files
+2025-12-21 16:10:24,315 - INFO - [__main__] - Executing tests from individual solution files...
+2025-12-21 16:10:24,332 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 16:10:24,332 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 16:10:24,333 - WARNING - [evaluation_layer.sandbox_executor] - Could not extract function name, using 'candidate'
+2025-12-21 16:10:24,333 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'candidate' for test execution
+2025-12-21 16:10:24,335 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/0
+2025-12-21 16:10:25,566 - ERROR - [evaluation_layer.sandbox_executor] - Docker container error: Command '['python', '/tmp/test.py']' in image 'python:3.9-slim' returned non-zero exit status 2: b''
+2025-12-21 16:10:25,568 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 16:10:25,568 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 16:10:25,569 - WARNING - [evaluation_layer.sandbox_executor] - Could not extract function name, using 'candidate'
+2025-12-21 16:10:25,569 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'candidate' for test execution
+2025-12-21 16:10:25,570 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/0
+2025-12-21 16:10:26,352 - ERROR - [evaluation_layer.sandbox_executor] - Docker container error: Command '['python', '/tmp/test.py']' in image 'python:3.9-slim' returned non-zero exit status 2: b''
+2025-12-21 16:10:26,353 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 16:10:26,354 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 16:10:26,354 - WARNING - [evaluation_layer.sandbox_executor] - Could not extract function name, using 'candidate'
+2025-12-21 16:10:26,355 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'candidate' for test execution
+2025-12-21 16:10:26,356 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/1
+2025-12-21 16:10:27,163 - ERROR - [evaluation_layer.sandbox_executor] - Docker container error: Command '['python', '/tmp/test.py']' in image 'python:3.9-slim' returned non-zero exit status 2: b''
+2025-12-21 16:10:27,165 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 16:10:27,165 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 16:10:27,166 - WARNING - [evaluation_layer.sandbox_executor] - Could not extract function name, using 'candidate'
+2025-12-21 16:10:27,166 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'candidate' for test execution
+2025-12-21 16:10:27,167 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/1
+2025-12-21 16:10:27,921 - ERROR - [evaluation_layer.sandbox_executor] - Docker container error: Command '['python', '/tmp/test.py']' in image 'python:3.9-slim' returned non-zero exit status 2: b''
+2025-12-21 16:10:27,922 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 16:10:27,923 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 16:10:27,923 - WARNING - [evaluation_layer.sandbox_executor] - Could not extract function name, using 'candidate'
+2025-12-21 16:10:27,923 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'candidate' for test execution
+2025-12-21 16:10:27,924 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/2
+2025-12-21 16:10:28,690 - ERROR - [evaluation_layer.sandbox_executor] - Docker container error: Command '['python', '/tmp/test.py']' in image 'python:3.9-slim' returned non-zero exit status 2: b''
+2025-12-21 16:10:28,691 - INFO - [evaluation_layer.sandbox_executor] - Docker client available: True
+2025-12-21 16:10:28,692 - INFO - [evaluation_layer.sandbox_executor] - Choosing Docker execution path
+2025-12-21 16:10:28,692 - WARNING - [evaluation_layer.sandbox_executor] - Could not extract function name, using 'candidate'
+2025-12-21 16:10:28,693 - INFO - [evaluation_layer.sandbox_executor] - Using function name 'candidate' for test execution
+2025-12-21 16:10:28,694 - INFO - [evaluation_layer.sandbox_executor] - Starting Docker container execution for HumanEval/2
+2025-12-21 16:10:29,381 - ERROR - [evaluation_layer.sandbox_executor] - Docker container error: Command '['python', '/tmp/test.py']' in image 'python:3.9-slim' returned non-zero exit status 2: b''
+2025-12-21 16:10:29,382 - INFO - [__main__] - Execution sources: {'docker_error': 6}
+2025-12-21 16:10:29,382 - INFO - [__main__] - COMPLETED: Test Execution from Individual Files in 5.07s
+2025-12-21 16:10:29,382 - INFO - [__main__] - STARTING: Results Combination
+2025-12-21 16:10:29,396 - INFO - [__main__] - Combined 6 results
+2025-12-21 16:10:29,396 - INFO - [__main__] - COMPLETED: Results Combination in 0.01s
+2025-12-21 16:10:29,397 - INFO - [__main__] - STARTING: Metrics Calculation
+2025-12-21 16:10:29,397 - INFO - [__main__] - Calculating evaluation metrics...
+2025-12-21 16:10:29,413 - INFO - [__main__] - Metrics calculated successfully
+2025-12-21 16:10:29,413 - INFO - [__main__] - COMPLETED: Metrics Calculation in 0.02s
+2025-12-21 16:10:29,414 - INFO - [__main__] - STARTING: Results Persistence
+2025-12-21 16:10:29,422 - INFO - [__main__] - Results saved to:
+2025-12-21 16:10:29,423 - INFO - [__main__] -    Solutions: results\generated_solutions.csv
+2025-12-21 16:10:29,424 - INFO - [__main__] -    Individual Files: results\individual_solutions
+2025-12-21 16:10:29,424 - INFO - [__main__] -    Full Results: results\evaluation_results.csv
+2025-12-21 16:10:29,424 - INFO - [__main__] -    Comparison: results\model_comparison.csv
+2025-12-21 16:10:29,424 - INFO - [__main__] - COMPLETED: Results Persistence in 0.01s
+2025-12-21 16:10:29,425 - INFO - [__main__] - EVALUATION COMPLETE!
+2025-12-21 16:10:29,425 - INFO - [__main__] - ============================================================
+2025-12-21 16:10:29,427 - INFO - [__main__] - OVERALL STATISTICS:
+2025-12-21 16:10:29,428 - INFO - [__main__] -    Total Solutions: 6
+2025-12-21 16:10:29,428 - INFO - [__main__] -    Passed Solutions: 0
+2025-12-21 16:10:29,428 - INFO - [__main__] -    Overall Pass Rate: 0.0%
+2025-12-21 16:10:29,429 - INFO - [__main__] - FUNCTIONAL CORRECTNESS METRICS:
+2025-12-21 16:10:29,429 - INFO - [__main__] -    pass@1: 0.000
+2025-12-21 16:10:29,429 - INFO - [__main__] -    pass@5: 0.000
+2025-12-21 16:10:29,430 - INFO - [__main__] -    pass@10: 0.000
+2025-12-21 16:10:29,430 - INFO - [__main__] - 
+MODEL COMPARISON:
+2025-12-21 16:10:29,431 - INFO - [__main__] -    codellama:7b:
+2025-12-21 16:10:29,432 - INFO - [__main__] -      Pass Rate: 0.000
+2025-12-21 16:10:29,433 - INFO - [__main__] -      Pass@1: 0.000
+2025-12-21 16:10:29,433 - INFO - [__main__] -      Pass@5: 0.000
+2025-12-21 16:10:29,433 - INFO - [__main__] -      Total Tests: 6
+2025-12-21 16:10:29,433 - INFO - [__main__] - 
+Evaluation completed successfully!
+2025-12-21 16:10:29,434 - INFO - [__main__] - Start the dashboard with: python dashboard/app.py

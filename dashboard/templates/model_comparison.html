@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Comparison - AI ModelEval</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-robot"></i> AI ModelEval
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/model_comparison">
+                            <i class="fas fa-chart-bar"></i> Model Comparison
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/evaluation_results">
+                            <i class="fas fa-list"></i> Evaluation Results
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1 class="display-4">
+                    <i class="fas fa-chart-bar text-primary"></i> Model Comparison
+                </h1>
+                <p class="lead text-muted">
+                    Detailed comparison of AI code generation models
+                </p>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+                        <li class="breadcrumb-item active">Model Comparison</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Filter and Controls -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-filter"></i> Filter Options
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Sort By:</label>
+                                <select id="sortBy" class="form-select" onchange="sortTable()">
+                                    <option value="pass_rate">Pass Rate (High to Low)</option>
+                                    <option value="pass_rate_asc">Pass Rate (Low to High)</option>
+                                    <option value="pass@1">Pass@1 (High to Low)</option>
+                                    <option value="total_tests">Total Tests</option>
+                                    <option value="model_name">Model Name</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Search Models:</label>
+                                <input type="text" id="searchInput" class="form-control" 
+                                       placeholder="Search model names..." onkeyup="searchTable()">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Actions:</label>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-primary" onclick="refreshCharts()">
+                                        <i class="fas fa-sync-alt"></i> Refresh Charts
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Comparison Table -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-table"></i> Detailed Model Performance
+                            <span class="badge bg-info ms-2">{{ models|length }} Models</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if models %}
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="comparisonTable">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Model</th>
+                                        <th>Pass Rate</th>
+                                        <th>Pass@1</th>
+                                        <th>Pass@5</th>
+                                        <th>Total Tests</th>
+                                        <th>Passed Tests</th>
+                                        <th>Failed Tests</th>
+                                        <th>Success Rate</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for model in models %}
+                                    {% set success_rate = (model.passed_tests / model.total_tests * 100) if model.total_tests > 0 else 0 %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ model.model }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ model.get('description', 'Code generation model') }}</small>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="progress flex-grow-1" style="height: 20px;">
+                                                    <div class="progress-bar 
+                                                        {% if model.pass_rate > 0.7 %}bg-success
+                                                        {% elif model.pass_rate > 0.4 %}bg-warning
+                                                        {% else %}bg-danger{% endif %}" 
+                                                        style="width: {{ model.pass_rate * 100 }}%">
+                                                    </div>
+                                                </div>
+                                                <span class="ms-2">{{ (model.pass_rate * 100)|round(1) }}%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge 
+                                                {% if model.get('pass@1', 0) > 0.7 %}bg-success
+                                                {% elif model.get('pass@1', 0) > 0.4 %}bg-warning
+                                                {% else %}bg-danger{% endif %}">
+                                                {{ (model.get('pass@1', 0) * 100)|round(1) }}%
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge 
+                                                {% if model.get('pass@5', 0) > 0.7 %}bg-success
+                                                {% elif model.get('pass@5', 0) > 0.4 %}bg-warning
+                                                {% else %}bg-danger{% endif %}">
+                                                {{ (model.get('pass@5', 0) * 100)|round(1) }}%
+                                            </span>
+                                        </td>
+                                        <td>{{ model.total_tests }}</td>
+                                        <td>
+                                            <span class="badge bg-success">{{ model.passed_tests }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-danger">{{ model.total_tests - model.passed_tests }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="progress flex-grow-1" style="height: 10px;">
+                                                    <div class="progress-bar 
+                                                        {% if success_rate > 70 %}bg-success
+                                                        {% elif success_rate > 40 %}bg-warning
+                                                        {% else %}bg-danger{% endif %}" 
+                                                        style="width: {{ success_rate }}%">
+                                                    </div>
+                                                </div>
+                                                <span class="ms-2">{{ success_rate|round(1) }}%</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <a href="/evaluation_results?model={{ model.model|urlencode }}" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i> View Details
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-chart-bar fa-4x text-muted mb-3"></i>
+                            <h4>No Model Comparison Data Available</h4>
+                            <p class="text-muted">Run the AI model evaluation first to generate comparison data.</p>
+                            <a href="/" class="btn btn-primary">
+                                <i class="fas fa-arrow-left"></i> Back to Dashboard
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Charts -->
+        {% if models %}
+        <div class="row mb-4">
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-pie"></i> Model Performance Distribution
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="performanceChart" style="height: 400px;">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-spinner fa-spin me-2"></i> Loading performance chart...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-trophy"></i> Top Performers
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="topPerformersChart" style="height: 400px;">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-spinner fa-spin me-2"></i> Loading top performers chart...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Summary -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-calculator"></i> Statistics Summary
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title text-muted">Average Pass Rate</h6>
+                                        <h3 class="text-primary">
+                                            {% set avg_pass_rate = (models|map(attribute='pass_rate')|sum / models|length * 100) %}
+                                            {{ avg_pass_rate|round(1) }}%
+                                        </h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title text-muted">Best Model</h6>
+                                        <h5 class="text-success">
+                                            {% set best_model = models|sort(attribute='pass_rate', reverse=true)|first %}
+                                            {{ best_model.model }}
+                                        </h5>
+                                        <small>{{ (best_model.pass_rate * 100)|round(1) }}% Pass Rate</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title text-muted">Total Tests Run</h6>
+                                        <h3 class="text-info">
+                                            {{ models|sum(attribute='total_tests') }}
+                                        </h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title text-muted">Overall Success</h6>
+                                        <h3 class="text-warning">
+                                            {% set total_passed = models|sum(attribute='passed_tests') %}
+                                            {% set total_tests = models|sum(attribute='total_tests') %}
+                                            {% set overall_success = (total_passed / total_tests * 100) if total_tests > 0 else 0 %}
+                                            {{ overall_success|round(1) }}%
+                                        </h3>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Export Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-download"></i> Export Data
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Export the model comparison data for further analysis.</p>
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <button class="btn btn-success w-100" onclick="exportCSV()">
+                                    <i class="fas fa-file-csv"></i> Export as CSV
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <button class="btn btn-primary w-100" onclick="exportJSON()">
+                                    <i class="fas fa-file-code"></i> Export as JSON
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <button class="btn btn-warning w-100" onclick="printTable()">
+                                    <i class="fas fa-print"></i> Print Table
+                                </button>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <a href="/" class="btn btn-secondary w-100">
+                                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light mt-5 py-4">
+        <div class="container text-center">
+            <p class="mb-0">AI ModelEval - Model Comparison Dashboard</p>
+            <small>Analyzing {{ models|length }} AI models on HumanEval benchmark</small>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        {% if models %}
+        // Initialize charts when page is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            loadComparisonCharts();
+        });
+
+        function loadComparisonCharts() {
+            // Prepare data for charts
+            const modelNames = {{ models|map(attribute='model')|list|tojson }};
+            const passRates = {{ models|map(attribute='pass_rate')|list|tojson }};
+            const passAt1 = {{ models|map(attribute='pass@1')|list|tojson }};
+            
+            // Performance Distribution Chart
+            const performanceTrace = {
+                x: modelNames,
+                y: passRates,
+                type: 'bar',
+                name: 'Pass Rate',
+                marker: {
+                    color: passRates.map(rate => 
+                        rate > 0.7 ? '#27ae60' : 
+                        rate > 0.4 ? '#f39c12' : '#e74c3c'
+                    )
+                }
+            };
+
+            const performanceLayout = {
+                title: 'Model Pass Rate Distribution',
+                xaxis: { title: 'Model', tickangle: -45 },
+                yaxis: { 
+                    title: 'Pass Rate', 
+                    tickformat: ',.0%',
+                    range: [0, 1]
+                },
+                height: 400,
+                margin: { b: 100 }
+            };
+
+            Plotly.newPlot('performanceChart', [performanceTrace], performanceLayout);
+
+            // Top Performers Chart (Top 5)
+            const sortedModels = [...modelNames]
+                .map((name, index) => ({ name, rate: passRates[index] }))
+                .sort((a, b) => b.rate - a.rate)
+                .slice(0, 5);
+
+            const topPerformersTrace = {
+                x: sortedModels.map(m => m.name),
+                y: sortedModels.map(m => m.rate),
+                type: 'bar',
+                name: 'Top Performers',
+                marker: { 
+                    color: '#3498db',
+                    opacity: 0.8
+                }
+            };
+
+            const topPerformersLayout = {
+                title: 'Top 5 Performing Models',
+                xaxis: { title: 'Model' },
+                yaxis: { 
+                    title: 'Pass Rate', 
+                    tickformat: ',.0%',
+                    range: [0, 1]
+                },
+                height: 400
+            };
+
+            Plotly.newPlot('topPerformersChart', [topPerformersTrace], topPerformersLayout);
+        }
+
+        function refreshCharts() {
+            document.getElementById('performanceChart').innerHTML = 
+                '<div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin me-2"></i> Refreshing...</div>';
+            document.getElementById('topPerformersChart').innerHTML = 
+                '<div class="text-center text-muted py-4"><i class="fas fa-spinner fa-spin me-2"></i> Refreshing...</div>';
+            
+            setTimeout(loadComparisonCharts, 500);
+        }
+        {% endif %}
+
+        // Table Sorting
+        function sortTable() {
+            const sortBy = document.getElementById('sortBy').value;
+            const table = document.getElementById('comparisonTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            rows.sort((a, b) => {
+                let aValue, bValue;
+                
+                switch(sortBy) {
+                    case 'pass_rate':
+                        aValue = parseFloat(a.cells[1].querySelector('span').textContent);
+                        bValue = parseFloat(b.cells[1].querySelector('span').textContent);
+                        return bValue - aValue;
+                    case 'pass_rate_asc':
+                        aValue = parseFloat(a.cells[1].querySelector('span').textContent);
+                        bValue = parseFloat(b.cells[1].querySelector('span').textContent);
+                        return aValue - bValue;
+                    case 'pass@1':
+                        aValue = parseFloat(a.cells[2].querySelector('.badge').textContent);
+                        bValue = parseFloat(b.cells[2].querySelector('.badge').textContent);
+                        return bValue - aValue;
+                    case 'total_tests':
+                        aValue = parseInt(a.cells[4].textContent);
+                        bValue = parseInt(b.cells[4].textContent);
+                        return bValue - aValue;
+                    case 'model_name':
+                        aValue = a.cells[0].querySelector('strong').textContent.toLowerCase();
+                        bValue = b.cells[0].querySelector('strong').textContent.toLowerCase();
+                        return aValue.localeCompare(bValue);
+                    default:
+                        return 0;
+                }
+            });
+            
+            // Reappend rows in sorted order
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Table Search
+        function searchTable() {
+            const input = document.getElementById('searchInput').value.toLowerCase();
+            const table = document.getElementById('comparisonTable');
+            const rows = table.querySelectorAll('tbody tr');
+            
+            rows.forEach(row => {
+                const modelName = row.cells[0].querySelector('strong').textContent.toLowerCase();
+                row.style.display = modelName.includes(input) ? '' : 'none';
+            });
+        }
+
+        // Export Functions
+        function exportCSV() {
+            alert('CSV export would download model comparison data as CSV file');
+            // In real implementation: window.location.href = '/api/export/csv';
+        }
+
+        function exportJSON() {
+            alert('JSON export would download model comparison data as JSON file');
+            // In real implementation: window.location.href = '/api/export/json';
+        }
+
+        function printTable() {
+            window.print();
+        }
+    </script>
+</body>
+</html>

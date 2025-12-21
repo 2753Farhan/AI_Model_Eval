@@ -1,0 +1,62 @@
+Human Baseline Metrics Summary
+========================================
+Platform: win32
+Total problems: 164
+Successful analyses: 164
+Failed analyses: 0
+Success rate: 100.0%
+
+loc:
+  Mean: 21.49
+  Std:  8.55
+  Min:  9.00
+  Max:  59.00
+
+lloc:
+  Mean: 8.70
+  Std:  4.89
+  Min:  3.00
+  Max:  31.00
+
+comments:
+  Mean: 0.02
+  Std:  0.17
+  Min:  0.00
+  Max:  2.00
+
+cyclomatic_complexity:
+  Mean: 3.61
+  Std:  2.29
+  Min:  1.00
+  Max:  15.00
+
+maintainability_index:
+  Mean: 82.53
+  Std:  14.82
+  Min:  38.63
+  Max:  100.00
+
+cognitive_complexity:
+  Mean: 4.99
+  Std:  5.82
+  Min:  0.00
+  Max:  52.00
+
+pylint_errors:
+  Mean: 0.00
+  Std:  0.00
+  Min:  0.00
+  Max:  0.00
+
+pylint_warnings:
+  Mean: 0.00
+  Std:  0.00
+  Min:  0.00
+  Max:  0.00
+
+security_issues:
+  Mean: 0.02
+  Std:  0.13
+  Min:  0.00
+  Max:  1.00
+

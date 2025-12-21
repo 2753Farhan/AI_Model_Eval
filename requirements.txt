@@ -13,3 +13,12 @@ cognitive_complexity
 flask
 plotly
 pygments
+
+
+
+
+# AI Model Integration
+huggingface_hub
+ollama
+requests
+docker
