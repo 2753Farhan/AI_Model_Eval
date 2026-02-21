@@ -1,0 +1,21 @@
+"""
+AI Generated Solution
+Task ID: HumanEval/25
+Model: codellama:7b
+Strategy: zero_shot
+Sample ID: 0
+Generated: 2026-01-11T00:13:26.141320
+"""
+
+def factorize(n):
+    factors = []
+    i = 2
+    while i * i <= n:
+        if n % i:
+            i += 1
+        else:
+            n //= i
+            factors.append(i)
+    if n > 1:
+        factors.append(n)
+    return factors

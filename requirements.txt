@@ -8,6 +8,7 @@ pyyaml
 tqdm
 gitpython
 cognitive_complexity
+psutil
 
 # NEW: Web dashboard dependencies
 flask

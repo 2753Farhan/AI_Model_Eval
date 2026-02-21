@@ -5,7 +5,7 @@ Model: codellama:7b
 """
 
 def truncate_number(number):
-    return abs(number - int(number))
+    return abs(number) % 1
 
 
 

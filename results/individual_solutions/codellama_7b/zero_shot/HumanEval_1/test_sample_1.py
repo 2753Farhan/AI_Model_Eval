@@ -5,27 +5,50 @@ Model: codellama:7b
 """
 
 def separate_paren_groups(paren_string):
-    # Create an empty list to store the separated groups
-    separated_groups = []
-
-    # Iterate through the characters in the input string
+    stack = []
+    result = []
     for char in paren_string:
-        # If the current character is an open bracket, increase the count
-        if char == '(':
-            count += 1
-        # If the current character is a close bracket, decrease the count
-        elif char == ')':
-            count -= 1
+        if char == "(":
+            stack.append(char)
+        elif char == ")":
+            top = stack.pop()
+            while top != "(":
+                result.append(top)
+                top = stack.pop()
+    return ["".join(result)] + stack[::-1]
 
-        # If the count is zero, it means we have reached the end of a group
-        if count == 0:
-            # Add the current group to the list of separated groups
-            separated_groups.append(group)
-            # Reset the group and the count
-            group = ''
-            count = 0
 
-    return separated_groups
+# Test case 1:
+paren_string = "( ) (( )) (( )( ))"
+print(separate_paren_groups(paren_string)) # Output: ['()', '(())', '(()())']
+
+# Test case 2:
+paren_string = "()"
+print(separate_paren_groups(paren_string)) # Output: ['()']
+
+# Test case 3:
+paren_string = "((()))"
+print(separate_paren_groups(paren_string)) # Output: ['()()()']
+
+# Test case 4:
+paren_string = "(()())"
+print(separate_paren_groups(paren_string)) # Output: ['()()()']
+
+# Test case 5:
+paren_string = "( ( () ) (( )) )"
+print(separate_paren_groups(paren_string)) # Output: ['()', '()()', '(()())']
+
+# Test case 6:
+paren_string = "((( )))"
+print(separate_paren_groups(paren_string)) # Output: ['()()()']
+
+# Test case 7:
+paren_string = "( ( ) ( ) (( )) (( )( )) )"
+print(separate_paren_groups(paren_string)) # Output: ['()', '()', '(()())', '(()())']
+
+# Test case 8:
+paren_string = "((( () )))"
+print(separate_paren_groups(paren_string)) # Output: ['()()()']
 
 
 

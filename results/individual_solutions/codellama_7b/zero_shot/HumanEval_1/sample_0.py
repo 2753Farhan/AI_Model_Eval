@@ -4,7 +4,7 @@ Task ID: HumanEval/1
 Model: codellama:7b
 Strategy: zero_shot
 Sample ID: 0
-Generated: 2025-12-21T18:43:57.648793
+Generated: 2026-01-11T00:13:26.080711
 """
 
 def separate_paren_groups(paren_string):
@@ -15,7 +15,7 @@ def separate_paren_groups(paren_string):
             stack.append(char)
         elif char == ")":
             top = stack.pop()
-            while top != "(":
-                result.append(top)
-                top = stack.pop()
-    return ["".join(result)] + [")" + x for x in result[::-1]]
+            if top == "(":
+                result.append("".join(stack[::-1]))
+                stack = []
+    return result

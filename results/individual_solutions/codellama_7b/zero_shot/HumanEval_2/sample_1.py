@@ -4,8 +4,8 @@ Task ID: HumanEval/2
 Model: codellama:7b
 Strategy: zero_shot
 Sample ID: 1
-Generated: 2025-12-21T18:43:57.651795
+Generated: 2026-01-11T00:13:26.084222
 """
 
 def truncate_number(number):
-    return abs(number - int(number))
+    return abs(number) % 1

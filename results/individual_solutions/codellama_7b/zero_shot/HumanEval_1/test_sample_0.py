@@ -12,10 +12,10 @@ def separate_paren_groups(paren_string):
             stack.append(char)
         elif char == ")":
             top = stack.pop()
-            while top != "(":
-                result.append(top)
-                top = stack.pop()
-    return ["".join(result)] + [")" + x for x in result[::-1]]
+            if top == "(":
+                result.append("".join(stack[::-1]))
+                stack = []
+    return result
 
 
 

@@ -1,2 +1,2 @@
 model,total_tests,passed_tests,pass_rate,pass@1,pass@5,avg_execution_time
-codellama:7b,6,4,0.6666666666666666,0.6666666666666666,0.0,0.0
+codellama:7b,328,130,0.39634146341463417,0.39634146341463417,0.0,0.0

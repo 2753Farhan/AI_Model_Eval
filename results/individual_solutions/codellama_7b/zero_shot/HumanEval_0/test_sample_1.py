@@ -7,7 +7,7 @@ Model: codellama:7b
 def has_close_elements(numbers, threshold):
     for i in range(len(numbers)-1):
         for j in range(i+1, len(numbers)):
-            if abs(numbers[j]-numbers[i]) < threshold:
+            if abs(numbers[i]-numbers[j])<threshold:
                 return True
     return False
 
