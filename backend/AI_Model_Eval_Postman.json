@@ -1,0 +1,591 @@
+{
+  "info": {
+    "name": "AI Model Evaluation API",
+    "_postman_id": "ai-model-eval-2025",
+    "description": "Complete API collection for AI Model Evaluation Framework",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Models",
+      "item": [
+        {
+          "name": "List All Models",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/models",
+              "host": ["{{base_url}}"],
+              "path": ["api", "models"]
+            }
+          }
+        },
+        {
+          "name": "Get Model Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/models/{{model_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "models", "{{model_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Model Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/models/{{model_id}}/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "models", "{{model_id}}", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Test Model Connection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/models/{{model_id}}/test",
+              "host": ["{{base_url}}"],
+              "path": ["api", "models", "{{model_id}}", "test"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Datasets",
+      "item": [
+        {
+          "name": "List Datasets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/datasets",
+              "host": ["{{base_url}}"],
+              "path": ["api", "datasets"]
+            }
+          }
+        },
+        {
+          "name": "Get Dataset Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/datasets/{{dataset_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "datasets", "{{dataset_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Dataset Samples",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/datasets/{{dataset_id}}/samples?limit=50&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "datasets", "{{dataset_id}}", "samples"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Single Sample",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/datasets/{{dataset_id}}/samples/{{sample_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "datasets", "{{dataset_id}}", "samples", "{{sample_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Dataset Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/datasets/{{dataset_id}}/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "datasets", "{{dataset_id}}", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Search Samples",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/datasets/{{dataset_id}}/search?q={{query}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "datasets", "{{dataset_id}}", "search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "{{query}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Evaluations",
+      "item": [
+        {
+          "name": "Create Evaluation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/evaluations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "evaluations"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"user_id\": \"test_user\",\n    \"models\": [\"codellama:7b\"],\n    \"dataset_id\": \"humaneval\",\n    \"config\": {\n        \"num_samples\": 5,\n        \"timeout\": 30,\n        \"strategies\": [\"zero_shot\"]\n    }\n}"
+            }
+          }
+        },
+        {
+          "name": "List All Evaluations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/evaluations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "evaluations"]
+            }
+          }
+        },
+        {
+          "name": "Start Evaluation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/evaluations/{{evaluation_id}}/start",
+              "host": ["{{base_url}}"],
+              "path": ["api", "evaluations", "{{evaluation_id}}", "start"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          }
+        },
+        {
+          "name": "Get Evaluation Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/evaluations/{{evaluation_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "evaluations", "{{evaluation_id}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Get Evaluation Results",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/evaluations/{{evaluation_id}}/results",
+              "host": ["{{base_url}}"],
+              "path": ["api", "evaluations", "{{evaluation_id}}", "results"]
+            }
+          }
+        },
+        {
+          "name": "Generate Report",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/evaluations/{{evaluation_id}}/report",
+              "host": ["{{base_url}}"],
+              "path": ["api", "evaluations", "{{evaluation_id}}", "report"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"format\": \"html\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Evaluation",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/evaluations/{{evaluation_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "evaluations", "{{evaluation_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "List All Reports",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/reports",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports"]
+            }
+          }
+        },
+        {
+          "name": "Get Report Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/reports/{{report_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports", "{{report_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Download Report",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/reports/{{report_id}}/download",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports", "{{report_id}}", "download"]
+            }
+          }
+        },
+        {
+          "name": "Delete Report",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/reports/{{report_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "reports", "{{report_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Playground",
+      "item": [
+        {
+          "name": "Analyze Code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/analyze",
+              "host": ["{{base_url}}"],
+              "path": ["api", "analyze"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"code\": \"def solution():\\n    return \\\"Hello World\\\"\",\n    \"test_cases\": [\n        {\n            \"assertion\": \"assert solution() == \\\"Hello World\\\"\"\n        }\n    ],\n    \"language\": \"python\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Validate Code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/validate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "validate"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"code\": \"def solution():\\n    return \\\"Hello World\\\"\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Model Comparison",
+      "item": [
+        {
+          "name": "Compare Models",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/compare",
+              "host": ["{{base_url}}"],
+              "path": ["api", "compare"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"model_ids\": [\"codellama:7b\", \"codellama:13b\"]\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Settings",
+      "item": [
+        {
+          "name": "Get Settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "settings"]
+            }
+          }
+        },
+        {
+          "name": "Update Settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/settings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "settings"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"default_models\": [\"codellama:7b\"],\n    \"export_format\": \"html\",\n    \"timeout\": 30\n}"
+            }
+          }
+        },
+        {
+          "name": "Check Ollama Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings/ollama",
+              "host": ["{{base_url}}"],
+              "path": ["api", "settings", "ollama"]
+            }
+          }
+        }
+      ]
+    },
+  {
+    "name": "9. Code Metrics",
+    "item": [
+      {
+        "name": "Analyze Code Metrics",
+        "request": {
+          "method": "POST",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "url": {
+            "raw": "{{base_url}}/api/metrics/code",
+            "host": ["{{base_url}}"],
+            "path": ["api", "metrics", "code"]
+          },
+          "body": {
+            "mode": "raw",
+            "raw": "{\n    \"code\": \"def factorial(n):\\n    if n <= 1:\\n        return 1\\n    return n * factorial(n-1)\",\n    \"language\": \"python\"\n}"
+          }
+        }
+      },
+      {
+        "name": "Compare Code Metrics",
+        "request": {
+          "method": "POST",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "url": {
+            "raw": "{{base_url}}/api/metrics/compare",
+            "host": ["{{base_url}}"],
+            "path": ["api", "metrics", "compare"]
+          },
+          "body": {
+            "mode": "raw",
+            "raw": "{\n    \"code1\": \"def factorial(n):\\n    if n <= 1:\\n        return 1\\n    return n * factorial(n-1)\",\n    \"code2\": \"def factorial(n):\\n    result = 1\\n    for i in range(1, n+1):\\n        result *= i\\n    return result\",\n    \"calculate_similarity\": true\n}"
+          }
+        }
+      },
+      {
+        "name": "Batch Metrics",
+        "request": {
+          "method": "POST",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "url": {
+            "raw": "{{base_url}}/api/metrics/batch",
+            "host": ["{{base_url}}"],
+            "path": ["api", "metrics", "batch"]
+          },
+          "body": {
+            "mode": "raw",
+            "raw": "{\n    \"codes\": [\n        \"def add(a, b): return a + b\",\n        \"def factorial(n):\\n    if n <= 1:\\n        return 1\\n    return n * factorial(n-1)\"\n    ]\n}"
+          }
+        }
+      },
+      {
+        "name": "Explain Metric",
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{base_url}}/api/metrics/explain/cyclomatic_complexity",
+            "host": ["{{base_url}}"],
+            "path": ["api", "metrics", "explain", "cyclomatic_complexity"]
+          }
+        }
+      }
+    ]
+  }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5001",
+      "type": "string"
+    },
+    {
+      "key": "model_id",
+      "value": "codellama:7b",
+      "type": "string"
+    },
+    {
+      "key": "dataset_id",
+      "value": "humaneval",
+      "type": "string"
+    },
+    {
+      "key": "sample_id",
+      "value": "prob_123",
+      "type": "string"
+    },
+    {
+      "key": "evaluation_id",
+      "value": "eval_123",
+      "type": "string"
+    },
+    {
+      "key": "report_id",
+      "value": "rpt_123",
+      "type": "string"
+    },
+    {
+      "key": "query",
+      "value": "binary tree",
+      "type": "string"
+    }
+  ]
+}

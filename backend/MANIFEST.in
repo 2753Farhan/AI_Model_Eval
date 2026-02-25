@@ -1,0 +1,88 @@
+# AI Model Evaluation Framework
+
+Comprehensive framework for evaluating AI code generation models with multiple evaluation metrics, sandbox execution, and detailed reporting.
+
+## Quick Start
+
+```bash
+# Install
+pip install -e .
+
+# Run evaluation
+python main.py --mode eval --models ollama huggingface --samples 10
+
+# Start dashboard
+python main.py --mode dashboard
+```
+
+## Project Structure
+
+The project is organized into several key modules:
+
+- **entities**: Data models for users, evaluations, problems, results, metrics
+- **managers**: Business logic for managing evaluations and aggregating results
+- **adapters**: Interface implementations for different model providers (Ollama, HuggingFace)
+- **loaders**: Dataset loaders for different benchmarks (HumanEval)
+- **executors**: Sandboxed code execution with resource management
+- **calculators**: Metric calculation (Pass@k, CodeBLEU, complexity)
+- **analyzers**: Error analysis, pattern detection, fix suggestions
+- **generators**: Report generation in multiple formats (HTML, PDF, CSV, JSON)
+- **prompts**: Prompt strategies (Zero-Shot, Few-Shot, Chain-of-Thought)
+- **dashboard**: Web interface for visualization
+- **utils**: Utilities for disk space management, timing, validation
+- **config**: Configuration management
+
+## Configuration
+
+Edit `src/config/settings.yaml` to configure:
+
+```yaml
+models:
+  - name: "ollama"
+    enabled: true
+  - name: "huggingface"
+    enabled: true
+
+evaluation:
+  timeout: 30
+  memory_limit: "4GB"
+  num_workers: 4
+
+output:
+  results_dir: "results"
+  export_formats: [json, csv, html, pdf]
+```
+
+## Testing
+
+Run the test suite:
+
+```bash
+# Using pytest
+pytest
+
+# Using unittest
+python -m unittest discover
+
+# From tests package
+python tests/
+```
+
+## Features
+
+- ✅ Multi-model evaluation (Ollama, HuggingFace, OpenAI)
+- ✅ Comprehensive metrics (Pass@k, CodeBLEU, complexity, maintainability)
+- ✅ Secure code execution in sandboxes
+- ✅ Error analysis and pattern detection
+- ✅ Interactive dashboard
+- ✅ Multiple export formats
+- ✅ Resource management and monitoring
+- ✅ Comprehensive logging
+
+## Documentation
+
+See [README.md](README.md) for more information.
+
+## License
+
+MIT License

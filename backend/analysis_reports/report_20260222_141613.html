@@ -1,0 +1,175 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Dataset Analysis Report</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; }
+                h1 { color: #2c3e50; }
+                .summary { background: #f8f9fa; padding: 20px; border-radius: 5px; }
+                .stat { font-size: 24px; font-weight: bold; color: #3498db; }
+                .passed { color: #27ae60; }
+                .failed { color: #e74c3c; }
+                table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+                th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+                th { background-color: #3498db; color: white; }
+                tr:nth-child(even) { background-color: #f2f2f2; }
+            </style>
+        </head>
+        <body>
+            <h1>📊 Dataset Analysis Report</h1>
+            <p>Generated: 2026-02-22 14:16:13</p>
+            
+            <div class="summary">
+                <h2>Summary Statistics</h2>
+                <p><span class="stat">164</span> Total Problems</p>
+                <p><span class="stat passed">154</span> Passed (93.9%)</p>
+                <p><span class="stat failed">10</span> Failed</p>
+                <p>Total Test Cases: 1181</p>
+                <p>Test Cases Passed: 1156 
+                   (97.9%)</p>
+            </div>
+            
+            <h2>Error Breakdown</h2>
+            <table>
+                <tr>
+                    <th>Error Type</th>
+                    <th>Count</th>
+                </tr>
+        
+                <tr>
+                    <td>Other</td>
+                    <td>7</td>
+                </tr>
+            
+                <tr>
+                    <td>SyntaxError</td>
+                    <td>3</td>
+                </tr>
+            
+            </table>
+            
+            <h2>Complexity Analysis</h2>
+            <table>
+                <tr>
+                    <th>Difficulty</th>
+                    <th>Total</th>
+                    <th>Passed</th>
+                    <th>Pass Rate</th>
+                </tr>
+        
+                <tr>
+                    <td>Easy</td>
+                    <td>46</td>
+                    <td>42</td>
+                    <td>91.3%</td>
+                </tr>
+                
+                <tr>
+                    <td>Medium</td>
+                    <td>45</td>
+                    <td>41</td>
+                    <td>91.1%</td>
+                </tr>
+                
+                <tr>
+                    <td>Hard</td>
+                    <td>73</td>
+                    <td>71</td>
+                    <td>97.3%</td>
+                </tr>
+                
+            </table>
+            
+            <h2>Failed Problems Details</h2>
+            <table>
+                <tr>
+                    <th>Task ID</th>
+                    <th>Error Type</th>
+                    <th>Tests Passed</th>
+                    <th>Error Message</th>
+                </tr>
+        
+                <tr>
+                    <td>HumanEval/1</td>
+                    <td>SyntaxError</td>
+                    <td>0/4</td>
+                    <td>File "/tmp/test", line 29
+    return True, "Test 1 passed"
+    ^
+SyntaxError: invalid syntax</td>
+                </tr>
+                
+                <tr>
+                    <td>HumanEval/10</td>
+                    <td>Other</td>
+                    <td>1/5</td>
+                    <td>JSON_RESULTS:{"total_tests": 5, "passed": 1, "failed": 4, "test_results": [{"test_id": 0, "passed": </td>
+                </tr>
+                
+                <tr>
+                    <td>HumanEval/32</td>
+                    <td>Other</td>
+                    <td>0/1</td>
+                    <td>JSON_RESULTS:{"total_tests": 1, "passed": 0, "failed": 1, "test_results": [{"test_id": 0, "passed": </td>
+                </tr>
+                
+                <tr>
+                    <td>HumanEval/38</td>
+                    <td>Other</td>
+                    <td>0/1</td>
+                    <td>JSON_RESULTS:{"total_tests": 1, "passed": 0, "failed": 1, "test_results": [{"test_id": 0, "passed": </td>
+                </tr>
+                
+                <tr>
+                    <td>HumanEval/44</td>
+                    <td>Other</td>
+                    <td>6/7</td>
+                    <td>JSON_RESULTS:{"total_tests": 7, "passed": 6, "failed": 1, "test_results": [{"test_id": 0, "passed": </td>
+                </tr>
+                
+                <tr>
+                    <td>HumanEval/50</td>
+                    <td>Other</td>
+                    <td>0/1</td>
+                    <td>JSON_RESULTS:{"total_tests": 1, "passed": 0, "failed": 1, "test_results": [{"test_id": 0, "passed": </td>
+                </tr>
+                
+                <tr>
+                    <td>HumanEval/53</td>
+                    <td>Other</td>
+                    <td>5/6</td>
+                    <td>JSON_RESULTS:{"total_tests": 6, "passed": 5, "failed": 1, "test_results": [{"test_id": 0, "passed": </td>
+                </tr>
+                
+                <tr>
+                    <td>HumanEval/87</td>
+                    <td>SyntaxError</td>
+                    <td>0/7</td>
+                    <td>File "/tmp/test", line 12
+    return True, "Test 1 passed"
+    ^
+SyntaxError: invalid syntax</td>
+                </tr>
+                
+                <tr>
+                    <td>HumanEval/113</td>
+                    <td>SyntaxError</td>
+                    <td>0/4</td>
+                    <td>File "/tmp/test", line 33
+    return True, "Test 3 passed"
+    ^
+SyntaxError: invalid syntax</td>
+                </tr>
+                
+                <tr>
+                    <td>HumanEval/151</td>
+                    <td>Other</td>
+                    <td>6/7</td>
+                    <td>JSON_RESULTS:{"total_tests": 7, "passed": 6, "failed": 1, "test_results": [{"test_id": 0, "passed": </td>
+                </tr>
+                
+            </table>
+        </body>
+        </html>
+        
