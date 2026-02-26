@@ -12,6 +12,7 @@ import json
 import time
 import logging
 from datetime import datetime
+from ..utils.code_formatter import CodeFormatter
 
 logger = logging.getLogger(__name__)
 
@@ -82,9 +83,35 @@ class SandboxExecutor:
         code: str,
         test_cases: List[Dict[str, Any]],
         problem_id: str,
-        language: str = "python"
+        language: str = "python",
+        entry_point: Optional[str] = None,
+        prompt: Optional[str] = None,
+        is_canonical: bool = False
     ) -> Dict[str, Any]:
-        """Execute code safely"""
+        """
+        Execute code safely with automatic formatting
+        
+        Args:
+            code: The code to execute
+            test_cases: List of test cases
+            problem_id: ID of the problem
+            language: Programming language
+            entry_point: Function name (for canonical solutions)
+            prompt: Original problem prompt (for canonical solutions)
+            is_canonical: Whether this is a canonical solution
+        
+        Returns:
+            Execution results
+        """
+        # Format the code before execution
+        formatted_code = CodeFormatter.prepare_for_execution(
+            code=code,
+            entry_point=entry_point,
+            prompt=prompt,
+            is_canonical=is_canonical
+        )
+        
+        # Continue with existing execution logic using formatted_code
         if language not in self.supported_languages:
             return {
                 'passed': False,
@@ -97,12 +124,12 @@ class SandboxExecutor:
                 }],
                 'execution_time_ms': 0
             }
-
+    
         if self.docker_client:
-            return await self._execute_with_docker(code, test_cases, problem_id, language)
+            return await self._execute_with_docker(formatted_code, test_cases, problem_id, language)
         else:
-            return await self._execute_with_fallback(code, test_cases, language)
-
+            return await self._execute_with_fallback(formatted_code, test_cases, language)
+            
     async def _execute_with_docker(
         self,
         code: str,
@@ -110,15 +137,56 @@ class SandboxExecutor:
         problem_id: str,
         language: str
     ) -> Dict[str, Any]:
-        """Execute with Docker sandbox"""
+        """Execute with Docker sandbox with function name mapping"""
         result_queue = queue.Queue()
         start_time = time.time()
         
         def run_container():
             temp_file = None
             try:
-                # Create test program
-                test_program = self._create_test_program(code, test_cases, language)
+                # First, extract function name from the code
+                function_name = None
+                try:
+                    # Create a temporary namespace to parse the function name
+                    namespace = {}
+                    # Try to execute the code in a controlled way just to find functions
+                    # We'll use ast for safer parsing
+                    import ast
+                    tree = ast.parse(code)
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.FunctionDef):
+                            function_name = node.name
+                            break
+                except Exception as e:
+                    logger.warning(f"Could not extract function name: {e}")
+                
+                logger.info(f"Detected function name: {function_name}")
+                
+                # Modify test cases to use the actual function name
+                modified_test_cases = []
+                for test in test_cases:
+                    if 'assertion' in test and function_name and function_name != 'candidate':
+                        # Replace 'candidate' with the actual function name in the assertion
+                        modified_test = test.copy()
+                        original_assertion = test['assertion']
+                        modified_assertion = original_assertion.replace('candidate', function_name)
+                        modified_test['assertion'] = modified_assertion
+                        modified_test_cases.append(modified_test)
+                        logger.debug(f"Modified assertion: {original_assertion} -> {modified_assertion}")
+                    else:
+                        modified_test_cases.append(test)
+                
+                # Also check if we need to add an alias for the function
+                modified_code = code
+                if function_name and function_name != 'candidate':
+                    # Add an alias at the end of the code to maintain backward compatibility
+                    # This is useful if the test cases expect 'candidate' directly
+                    alias_code = f"\n\n# Added alias for compatibility\ncandidate = {function_name}\n"
+                    modified_code = code + alias_code
+                    logger.info(f"Added alias: candidate = {function_name}")
+                
+                # Create test program with modified code and test cases
+                test_program = self._create_test_program(modified_code, modified_test_cases, language)
                 
                 # Write to temp file
                 with tempfile.NamedTemporaryFile(
@@ -129,6 +197,7 @@ class SandboxExecutor:
                 ) as f:
                     f.write(test_program)
                     temp_file = f.name
+                    logger.debug(f"Created temp file: {temp_file}")
                 
                 # Get container image
                 image = self._get_language_image(language)
@@ -152,6 +221,7 @@ class SandboxExecutor:
                 try:
                     container.wait(timeout=self.timeout)
                     logs = container.logs(stdout=True, stderr=True).decode('utf-8', errors='replace')
+                    logger.debug(f"Container logs: {logs[:500]}...")  # Log first 500 chars
                     
                     # Parse results
                     execution_result = self._parse_execution_output(logs)
@@ -167,7 +237,7 @@ class SandboxExecutor:
                         }
                     else:
                         raise
-                
+                    
                 finally:
                     container.remove()
                 
@@ -186,6 +256,7 @@ class SandboxExecutor:
                 if temp_file and os.path.exists(temp_file):
                     try:
                         os.unlink(temp_file)
+                        logger.debug(f"Deleted temp file: {temp_file}")
                     except Exception as e:
                         logger.warning(f"Could not delete temp file: {e}")
         
@@ -198,6 +269,7 @@ class SandboxExecutor:
         execution_time_ms = (time.time() - start_time) * 1000
         
         if thread.is_alive():
+            logger.warning(f"Execution timed out after {self.timeout} seconds")
             return {
                 'passed': False,
                 'result': 'timeout',
@@ -207,6 +279,7 @@ class SandboxExecutor:
             }
         
         if result_queue.empty():
+            logger.error("No result from container")
             return {
                 'passed': False,
                 'result': 'unknown_error',
@@ -217,8 +290,18 @@ class SandboxExecutor:
         
         result = result_queue.get()
         result['execution_time_ms'] = execution_time_ms
+        
+        # Add function name mapping info to metadata if needed
+        if 'metadata' not in result:
+            result['metadata'] = {}
+        result['metadata']['function_mapping'] = {
+            'detected_function': function_name if 'function_name' in locals() else None,
+            'test_count': len(test_cases),
+            'modified_test_count': len(modified_test_cases) if 'modified_test_cases' in locals() else len(test_cases)
+        }
+        
         return result
-
+    
     def _create_test_program(
         self,
         code: str,

@@ -1,9 +1,11 @@
-# src/managers/evaluation_manager.py (updated)
+# src/managers/evaluation_manager.py
+
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Callable
 import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from collections import defaultdict
 
 from ..entities import Evaluation, EvaluationResult, Problem
 from ..adapters import ModelRegistry
@@ -89,10 +91,16 @@ class EvaluationManager:
             
             # Run evaluations for each model
             all_results = []
-            for model_id in evaluation.model_ids:
+            total_models = len(evaluation.model_ids)
+            
+            for model_idx, model_id in enumerate(evaluation.model_ids):
+                model_progress_start = 10 + (model_idx / total_models * 60)
+                model_progress_end = 10 + ((model_idx + 1) / total_models * 60)
+                
                 with DebugTimer(f"Evaluating model {model_id}"):
                     model_results = await self._evaluate_model(
-                        model_id, problems, evaluation
+                        model_id, problems, evaluation,
+                        model_progress_start, model_progress_end
                     )
                     all_results.extend(model_results)
             
@@ -112,7 +120,7 @@ class EvaluationManager:
                 error_analysis = await self._analyze_errors(all_results)
                 evaluation.update_progress(95, "errors_analyzed")
                 self._notify_progress(evaluation, "errors_analyzed",
-                                    f"Found {error_analysis['total_errors']} errors")
+                                    f"Found {error_analysis.get('total_errors', 0)} errors")
             
             # Store results
             for result in all_results:
@@ -146,7 +154,9 @@ class EvaluationManager:
         self,
         model_id: str,
         problems: List[Problem],
-        evaluation: Evaluation
+        evaluation: Evaluation,
+        progress_start: float = 10,
+        progress_end: float = 70
     ) -> List[EvaluationResult]:
         """Evaluate a single model on all problems"""
         model = self.model_registry.get_model(model_id)
@@ -155,15 +165,17 @@ class EvaluationManager:
         
         all_results = []
         total = len(problems)
+        num_samples = evaluation.config.get('num_samples', 3)  # Default to 3 samples
         
         # Process in batches for better performance
-        batch_size = 3
+        batch_size = min(3, max(1, self.max_workers))
+        
         for i in range(0, total, batch_size):
             batch = problems[i:i+batch_size]
             
             tasks = []
             for problem in batch:
-                for sample_idx in range(evaluation.config.get('num_samples', 5)):
+                for sample_idx in range(num_samples):
                     tasks.append(self._evaluate_one_problem(
                         model, problem, evaluation, sample_idx
                     ))
@@ -178,7 +190,8 @@ class EvaluationManager:
                     all_results.append(result)
             
             # Update progress
-            progress = 10 + (min(i + batch_size, total) / total * 60)
+            progress = progress_start + (min(i + batch_size, total) / total * 
+                                       (progress_end - progress_start))
             evaluation.update_progress(progress, f"evaluating_{model_id}")
         
         return all_results
@@ -199,22 +212,33 @@ class EvaluationManager:
         )
         
         try:
-            # Generate code
+            # Get prompt
             prompt = problem.get_prompt()
-            generated_code = await model.generate_code(
-                prompt,
-                evaluation.config.get('generation_config', {})
-            )
+            
+            # Generate code
+            with DebugTimer(f"Code generation for {problem.problem_id}"):
+                generation_config = evaluation.config.get('generation_config', {})
+                generated_code = await model.generate_code(prompt, generation_config)
+                
             result.set_generated_code(generated_code)
             
-            # Execute code
-            execution_result = await self.sandbox.execute_safely(
-                generated_code,
-                problem.test_cases,
-                problem.problem_id,
-                language="python"
-            )
+            # Skip execution if generation failed (empty or error)
+            if not generated_code or generated_code.startswith('# Error'):
+                result.add_error('generation_failed', generated_code if generated_code else 'Empty response')
+                return result
             
+            # Execute code
+            with DebugTimer(f"Code execution for {problem.problem_id}"):
+                execution_result = await self.sandbox.execute_safely(
+                    generated_code,
+                    problem.test_cases,
+                    problem.problem_id,
+                    language="python",
+                    entry_point=problem.entry_point,
+                    prompt=problem.prompt
+                )
+            
+            # Set execution results
             result.set_execution_result(
                 passed=execution_result.get('passed', False),
                 output=execution_result.get('output', ''),
@@ -226,7 +250,8 @@ class EvaluationManager:
                 result.add_test_result(
                     test_id=test.get('test_id', 0),
                     passed=test.get('passed', False),
-                    message=test.get('message', '')
+                    message=test.get('message', ''),
+                    test_case=test.get('test_case')
                 )
             
             # Add errors
@@ -236,36 +261,122 @@ class EvaluationManager:
                     error_message=error.get('error_message', '')
                 )
             
-            # Calculate metrics
-            metrics = self.metric_calculator.calculate_for_result(result)
-            for name, value in metrics.items():
-                result.add_metric(name, value)
-            
         except Exception as e:
-            logger.error(f"Error in evaluation: {e}")
+            logger.error(f"Error in evaluation for problem {problem.problem_id}: {e}")
             result.add_error('evaluation_error', str(e))
         
         return result
 
     async def _calculate_metrics(self, results: List[EvaluationResult]) -> Dict[str, Any]:
         """Calculate aggregate metrics"""
-        return await asyncio.get_event_loop().run_in_executor(
-            self.executor,
-            self.metric_calculator.calculate_aggregate_metrics,
-            results
-        )
+        try:
+            # Check if the calculator has the method we need
+            if hasattr(self.metric_calculator, 'calculate_aggregate_metrics'):
+                return await asyncio.get_event_loop().run_in_executor(
+                    self.executor,
+                    self.metric_calculator.calculate_aggregate_metrics,
+                    results
+                )
+            elif hasattr(self.metric_calculator, 'calculate'):
+                # Try calculate method (some calculators use this)
+                metrics = await asyncio.get_event_loop().run_in_executor(
+                    self.executor,
+                    self.metric_calculator.calculate,
+                    results
+                )
+                # Enhance with additional stats
+                metrics.update(self._get_basic_stats(results))
+                return metrics
+            else:
+                # Manual calculation
+                return self._calculate_metrics_fallback(results)
+        except Exception as e:
+            logger.error(f"Metrics calculation failed: {e}")
+            return self._calculate_metrics_fallback(results)
+
+    def _get_basic_stats(self, results: List[EvaluationResult]) -> Dict[str, Any]:
+        """Get basic statistics from results"""
+        if not results:
+            return {}
+        
+        total = len(results)
+        passed = sum(1 for r in results if r.passed)
+        
+        return {
+            'total_results': total,
+            'passed_results': passed,
+            'pass_rate': passed / total if total > 0 else 0,
+            'failed_results': total - passed
+        }
+
+    def _calculate_metrics_fallback(self, results: List[EvaluationResult]) -> Dict[str, Any]:
+        """Fallback metrics calculation when calculator methods fail"""
+        if not results:
+            return {}
+        
+        total = len(results)
+        passed = sum(1 for r in results if r.passed)
+        
+        # Group by model
+        model_stats = defaultdict(lambda: {'total': 0, 'passed': 0})
+        for r in results:
+            model_stats[r.model_id]['total'] += 1
+            if r.passed:
+                model_stats[r.model_id]['passed'] += 1
+        
+        # Calculate pass rates per model
+        by_model = {}
+        for model_id, stats in model_stats.items():
+            by_model[model_id] = {
+                'pass_rate': stats['passed'] / stats['total'] if stats['total'] > 0 else 0,
+                'total': stats['total'],
+                'passed': stats['passed']
+            }
+        
+        # Execution time stats
+        exec_times = [r.execution_time_ms for r in results if r.execution_time_ms]
+        
+        return {
+            'total_results': total,
+            'passed_results': passed,
+            'pass_rate': passed / total if total > 0 else 0,
+            'failed_results': total - passed,
+            'total_errors': sum(len(r.errors) for r in results),
+            'avg_execution_time_ms': sum(exec_times) / len(exec_times) if exec_times else 0,
+            'by_model': by_model
+        }
 
     async def _analyze_errors(self, results: List[EvaluationResult]) -> Dict[str, Any]:
         """Analyze errors across results"""
-        all_errors = []
-        for result in results:
-            all_errors.extend(result.errors)
-        
-        return await asyncio.get_event_loop().run_in_executor(
-            self.executor,
-            self.error_analyzer.analyze_errors,
-            all_errors
-        )
+        try:
+            all_errors = []
+            for result in results:
+                all_errors.extend(result.errors)
+            
+            if hasattr(self.error_analyzer, 'analyze_errors'):
+                return await asyncio.get_event_loop().run_in_executor(
+                    self.executor,
+                    self.error_analyzer.analyze_errors,
+                    all_errors
+                )
+            else:
+                # Simple error analysis
+                error_types = {}
+                for error in all_errors:
+                    error_type = error.get('error_type', 'unknown')
+                    error_types[error_type] = error_types.get(error_type, 0) + 1
+                
+                return {
+                    'total_errors': len(all_errors),
+                    'error_types': error_types,
+                    'has_errors': len(all_errors) > 0
+                }
+        except Exception as e:
+            logger.error(f"Error analysis failed: {e}")
+            return {
+                'total_errors': sum(len(r.errors) for r in results),
+                'error': str(e)
+            }
 
     def _notify_progress(self, evaluation: Evaluation, stage: str, message: str, data: Optional[Dict] = None):
         """Notify progress callbacks"""
@@ -306,3 +417,26 @@ class EvaluationManager:
         if not evaluation:
             return False
         return evaluation.cancel()
+
+    def get_evaluation_summary(self, evaluation_id: str) -> Dict[str, Any]:
+        """Get summary of evaluation results"""
+        evaluation = self.get_evaluation(evaluation_id)
+        results = self.get_results(evaluation_id)
+        
+        if not evaluation:
+            return {'error': 'Evaluation not found'}
+        
+        total = len(results)
+        passed = sum(1 for r in results if r.passed)
+        
+        return {
+            'evaluation_id': evaluation_id,
+            'status': evaluation.status.value if hasattr(evaluation.status, 'value') else str(evaluation.status),
+            'total_samples': total,
+            'passed_samples': passed,
+            'pass_rate': passed / total if total > 0 else 0,
+            'models_tested': len(set(r.model_id for r in results)),
+            'problems_tested': len(set(r.problem_id for r in results)),
+            'duration_seconds': evaluation.get_duration(),
+            'created_at': evaluation.created_at.isoformat() if evaluation.created_at else None
+        }

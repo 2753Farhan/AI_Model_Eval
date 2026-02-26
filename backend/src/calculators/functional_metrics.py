@@ -1,3 +1,4 @@
+# src/calculators/functional_metrics.py
 
 from typing import List, Dict, Any, Optional
 import numpy as np
@@ -63,6 +64,78 @@ class FunctionalMetricsCalculator(MetricCalculator):
         
         return metrics
 
+    def calculate_aggregate_metrics(self, results: List[EvaluationResult]) -> Dict[str, Any]:
+        """Calculate aggregate metrics across all results"""
+        if not results:
+            return {}
+        
+        metrics = {}
+        
+        # Basic counts
+        total = len(results)
+        passed = sum(1 for r in results if r.passed)
+        
+        metrics['total_results'] = total
+        metrics['passed_results'] = passed
+        metrics['failed_results'] = total - passed
+        metrics['pass_rate'] = passed / total if total > 0 else 0
+        
+        # Group by problem and model for Pass@k
+        problem_model_groups = defaultdict(list)
+        for result in results:
+            key = (result.problem_id, result.model_id)
+            problem_model_groups[key].append(result)
+        
+        # Calculate Pass@k for different k values
+        for k in [1, 5, 10]:
+            pass_at_k = self._calculate_pass_at_k(problem_model_groups, k)
+            metrics[f'pass@{k}'] = pass_at_k
+        
+        # Error rate
+        error_count = sum(len(r.errors) for r in results)
+        metrics['error_rate'] = error_count / total if total > 0 else 0
+        metrics['total_errors'] = error_count
+        
+        # Execution time stats
+        exec_times = [r.execution_time_ms for r in results if r.execution_time_ms]
+        if exec_times:
+            metrics['avg_execution_time_ms'] = sum(exec_times) / len(exec_times)
+            metrics['min_execution_time_ms'] = min(exec_times)
+            metrics['max_execution_time_ms'] = max(exec_times)
+            metrics['total_execution_time_ms'] = sum(exec_times)
+        else:
+            metrics['avg_execution_time_ms'] = 0
+            metrics['min_execution_time_ms'] = 0
+            metrics['max_execution_time_ms'] = 0
+            metrics['total_execution_time_ms'] = 0
+        
+        # Test statistics
+        total_tests = 0
+        passed_tests = 0
+        for result in results:
+            if hasattr(result, 'test_results') and result.test_results:
+                total_tests += len(result.test_results)
+                passed_tests += sum(1 for t in result.test_results if t.get('passed', False))
+        
+        if total_tests > 0:
+            metrics['total_tests'] = total_tests
+            metrics['passed_tests'] = passed_tests
+            metrics['test_pass_rate'] = passed_tests / total_tests
+        else:
+            metrics['total_tests'] = 0
+            metrics['passed_tests'] = 0
+            metrics['test_pass_rate'] = 0
+        
+        # Model-specific metrics
+        model_metrics = self.calculate_by_model(results)
+        metrics['by_model'] = model_metrics
+        
+        # Problem-specific metrics
+        problem_stats = self.calculate_per_problem_stats(results)
+        metrics['by_problem'] = problem_stats
+        
+        return metrics
+
     def _calculate_pass_at_k(
         self,
         groups: Dict[tuple, List[EvaluationResult]],
@@ -105,7 +178,9 @@ class FunctionalMetricsCalculator(MetricCalculator):
             'pass_rate': 0,
             'avg_execution_time': 0,
             'total_tests': 0,
-            'passed_tests': 0
+            'passed_tests': 0,
+            'test_pass_rate': 0,
+            'total_errors': 0
         })
         
         for result in results:
@@ -120,6 +195,8 @@ class FunctionalMetricsCalculator(MetricCalculator):
             if result.test_results:
                 stats['total_tests'] += len(result.test_results)
                 stats['passed_tests'] += sum(1 for t in result.test_results if t.get('passed', False))
+            
+            stats['total_errors'] += len(result.errors)
         
         # Calculate averages
         for problem_id, stats in problem_stats.items():
@@ -129,6 +206,9 @@ class FunctionalMetricsCalculator(MetricCalculator):
             
             if stats['total_tests'] > 0:
                 stats['test_pass_rate'] = stats['passed_tests'] / stats['total_tests']
+            
+            if stats['total_samples'] > 0:
+                stats['avg_errors_per_sample'] = stats['total_errors'] / stats['total_samples']
         
         return dict(problem_stats)
 
@@ -143,6 +223,43 @@ class FunctionalMetricsCalculator(MetricCalculator):
         
         model_metrics = {}
         for model_id, model_results_list in model_results.items():
-            model_metrics[model_id] = self.calculate(model_results_list)
+            metrics = self.calculate(model_results_list)
+            
+            # Add aggregate stats
+            total = len(model_results_list)
+            passed = sum(1 for r in model_results_list if r.passed)
+            
+            metrics['total_samples'] = total
+            metrics['passed_samples'] = passed
+            metrics['failed_samples'] = total - passed
+            
+            # Execution time
+            exec_times = [r.execution_time_ms for r in model_results_list if r.execution_time_ms]
+            if exec_times:
+                metrics['avg_execution_time_ms'] = sum(exec_times) / len(exec_times)
+            
+            # Error count
+            metrics['total_errors'] = sum(len(r.errors) for r in model_results_list)
+            
+            model_metrics[model_id] = metrics
         
         return model_metrics
+
+    def get_summary_stats(self, results: List[EvaluationResult]) -> Dict[str, Any]:
+        """Get summary statistics for display"""
+        if not results:
+            return {}
+        
+        total = len(results)
+        passed = sum(1 for r in results if r.passed)
+        
+        return {
+            'total_evaluations': total,
+            'passed': passed,
+            'failed': total - passed,
+            'pass_rate': passed / total if total > 0 else 0,
+            'total_errors': sum(len(r.errors) for r in results),
+            'avg_execution_time': np.mean([r.execution_time_ms for r in results if r.execution_time_ms]) if any(r.execution_time_ms for r in results) else 0,
+            'models_tested': len(set(r.model_id for r in results)),
+            'problems_tested': len(set(r.problem_id for r in results))
+        }

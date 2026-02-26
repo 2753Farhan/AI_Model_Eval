@@ -23,12 +23,12 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   
 const menuItems = [
   { href: '/dashboard', icon: '📊', label: 'Dashboard' },
-  { href: '/datasets', icon: '📚', label: 'Datasets' },
+  { href: '/datasets', icon: '📚', label: 'Datasets' }, // Already there
   { href: '/evaluations', icon: '📋', label: 'Evaluations' },
   { href: '/models', icon: '🤖', label: 'Models' },
   { href: '/models/compare', icon: '⚖️', label: 'Compare Models' },
   { href: '/playground', icon: '💻', label: 'Playground' },
-  { href: '/finetuning', icon: '🎯', label: 'Fine-tuning' }, // Add this
+  { href: '/finetuning', icon: '🎯', label: 'Fine-tuning' },
   { href: '/reports', icon: '📈', label: 'Reports' },
   { href: '/settings', icon: '⚙️', label: 'Settings' },
 ];

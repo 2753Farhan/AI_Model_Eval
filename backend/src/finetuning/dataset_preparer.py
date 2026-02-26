@@ -1,118 +1,164 @@
-# src/finetuning/analyzer.py
+
+# src/finetuning/dataset_preparer.py
 """
-Analyzes evaluation results to identify failure patterns for fine-tuning
-Uses existing ErrorAnalyzer and PatternDetector
+Prepares training datasets for fine-tuning based on failure patterns
+Uses existing DatasetLoader
 """
 
 from typing import List, Dict, Any, Optional
-from collections import defaultdict
+import random
+from pathlib import Path
+import json
 import logging
 
-from ..analyzers import ErrorAnalyzer, PatternDetector
-from ..entities import EvaluationResult, Error
+from ..loaders import DatasetLoader
+from ..entities import Problem, EvaluationResult
 
 logger = logging.getLogger(__name__)
 
-class FailureAnalyzer:
-    """Analyzes evaluation failures to identify patterns for fine-tuning"""
+class DatasetPreparer:
+    """Prepares training datasets for fine-tuning based on failure patterns"""
     
-    def __init__(self, config: Optional[Dict] = None):
-        self.config = config or {}
-        # Use existing analyzers
-        self.error_analyzer = ErrorAnalyzer(config)
-        self.pattern_detector = PatternDetector(config)
-        
-    def analyze_evaluation(self, results: List[EvaluationResult]) -> Dict[str, Any]:
-        """Analyze evaluation results to identify failure patterns"""
-        
-        # Extract errors from results
-        all_errors = []
-        failures = []
-        
-        for result in results:
-            if not result.passed:
-                failures.append(result)
-                # Convert result errors to Error objects if needed
-                for err_dict in result.errors:
-                    error = Error.from_dict(err_dict) if isinstance(err_dict, dict) else err_dict
-                    all_errors.append(error)
-        
-        # Use existing error analyzer
-        error_analysis = self.error_analyzer.analyze_errors([e.to_dict() for e in all_errors])
-        
-        # Use existing pattern detector
-        patterns = self.pattern_detector.detect_patterns([e.to_dict() for e in all_errors])
-        
-        # Calculate failure statistics
-        analysis = {
-            'total_problems': len(results),
-            'total_failures': len(failures),
-            'failure_rate': len(failures) / len(results) if results else 0,
-            'error_analysis': error_analysis,
-            'patterns': patterns,
-            'recommendations': [],
-            'target_areas': []
-        }
-        
-        # Generate recommendations based on error analysis
-        analysis['recommendations'] = self._generate_recommendations(error_analysis, patterns)
-        
-        # Identify target areas for fine-tuning
-        analysis['target_areas'] = self._identify_target_areas(error_analysis, patterns)
-        
-        return analysis
+    def __init__(self, output_dir: str = "data/finetuning"):
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
     
-    def _generate_recommendations(self, error_analysis: Dict, patterns: List) -> List[str]:
-        """Generate fine-tuning recommendations"""
-        recommendations = []
+    def find_similar_problems(
+        self, 
+        failures: List[EvaluationResult],
+        candidate_dataset: DatasetLoader,
+        max_problems: int = 100
+    ) -> List[Problem]:
+        """Find problems similar to failures in candidate dataset"""
         
-        # Check failure rate
-        if error_analysis.get('total_errors', 0) > 50:
-            recommendations.append("High error rate detected. Consider comprehensive fine-tuning.")
+        similar_problems = []
         
-        # Check error types
-        by_type = error_analysis.get('by_type', {})
-        for error_type, count in by_type.items():
-            if count > 10:
-                recommendations.append(
-                    f"Frequent {error_type} errors ({count} occurrences). "
-                    f"Add training examples focusing on {error_type.replace('_', ' ')}."
-                )
+        # Extract keywords from failures
+        failure_keywords = self._extract_keywords(failures)
         
-        # Check patterns
-        if patterns:
-            top_pattern = patterns[0] if patterns else None
-            if top_pattern and top_pattern.get('occurrences', 0) > 5:
-                recommendations.append(
-                    f"Pattern detected: {top_pattern.get('pattern', 'unknown')}. "
-                    f"Consider adding similar examples to training data."
-                )
+        # Score each problem in candidate dataset
+        scored_problems = []
+        for problem in candidate_dataset.problems:
+            score = self._calculate_similarity_score(problem, failure_keywords)
+            if score > 0:
+                scored_problems.append((score, problem))
         
-        return recommendations
+        # Sort by similarity score
+        scored_problems.sort(reverse=True, key=lambda x: x[0])
+        
+        # Take top problems
+        similar_problems = [p for _, p in scored_problems[:max_problems]]
+        
+        logger.info(f"Found {len(similar_problems)} similar problems")
+        return similar_problems
     
-    def _identify_target_areas(self, error_analysis: Dict, patterns: List) -> List[Dict]:
-        """Identify specific areas to target for fine-tuning"""
-        target_areas = []
+    def _extract_keywords(self, failures: List[EvaluationResult]) -> Dict[str, float]:
+        """Extract keywords from failures with weights"""
+        keywords = {}
         
-        # Target top error types
-        by_type = error_analysis.get('by_type', {})
-        sorted_types = sorted(by_type.items(), key=lambda x: x[1], reverse=True)
+        for failure in failures:
+            # Extract from problem description if available
+            if hasattr(failure, 'metadata') and 'prompt' in failure.metadata:
+                words = failure.metadata['prompt'].lower().split()
+                for word in words:
+                    if len(word) > 3:  # Skip small words
+                        keywords[word] = keywords.get(word, 0) + 1
+            
+            # Extract from error messages
+            for error in failure.errors:
+                error_msg = error.get('error_message', '').lower()
+                error_words = error_msg.split()
+                for word in error_words:
+                    if len(word) > 3:
+                        keywords[word] = keywords.get(word, 0) + 2  # Higher weight for error words
         
-        for error_type, count in sorted_types[:3]:  # Top 3 error types
-            target_areas.append({
-                'type': 'error_category',
-                'name': error_type,
-                'count': count,
-                'priority': 'high' if count > 20 else 'medium'
-            })
+        # Normalize
+        total = sum(keywords.values())
+        if total > 0:
+            keywords = {k: v/total for k, v in keywords.items()}
         
-        # Target patterns
-        for pattern in patterns[:2]:  # Top 2 patterns
-            target_areas.append({
-                'type': 'pattern',
-                'name': pattern.get('pattern', 'unknown')[:50],
-                'count': pattern.get('occurrences', 0),
-                'severity': pattern.get('severity', 'medium')
-            })
+        return keywords
+    
+    def _calculate_similarity_score(self, problem: Problem, keywords: Dict[str, float]) -> float:
+        """Calculate similarity score between problem and keywords"""
+        score = 0.0
         
-        return target_areas
+        # Check problem prompt
+        prompt_lower = problem.prompt.lower()
+        for keyword, weight in keywords.items():
+            if keyword in prompt_lower:
+                score += weight
+        
+        # Check problem categories/tags
+        for category in problem.categories:
+            category_lower = category.lower()
+            for keyword, weight in keywords.items():
+                if keyword in category_lower:
+                    score += weight * 0.5
+        
+        return score
+    
+    def create_training_data(
+        self,
+        failures: List[EvaluationResult],
+        similar_problems: List[Problem],
+        output_file: str = "training_data.jsonl"
+    ) -> str:
+        """Create training data in JSONL format for fine-tuning"""
+        
+        training_examples = []
+        
+        # Add failure examples as negative examples
+        for failure in failures[:50]:  # Limit to 50 failures
+            example = self._create_training_example(failure, is_failure=True)
+            if example:
+                training_examples.append(example)
+        
+        # Add similar problems as positive examples
+        for problem in similar_problems:
+            example = self._create_problem_example(problem)
+            if example:
+                training_examples.append(example)
+        
+        # Save to file
+        output_path = self.output_dir / output_file
+        with open(output_path, 'w', encoding='utf-8') as f:
+            for example in training_examples:
+                f.write(json.dumps(example) + '\n')
+        
+        logger.info(f"Created {len(training_examples)} training examples in {output_path}")
+        return str(output_path)
+    
+    def _create_training_example(self, failure: EvaluationResult, is_failure: bool) -> Optional[Dict]:
+        """Create training example from a failure"""
+        try:
+            # Get problem info
+            problem_id = failure.problem_id
+            
+            example = {
+                "instruction": "Write a Python function that solves the following problem:",
+                "input": failure.metadata.get('prompt', 'Unknown problem'),
+                "output": failure.generated_code or "",
+                "is_failure": is_failure,
+                "error_type": failure.errors[0].get('error_type') if failure.errors else None
+            }
+            return example
+        except Exception as e:
+            logger.error(f"Error creating training example: {e}")
+            return None
+    
+    def _create_problem_example(self, problem: Problem) -> Optional[Dict]:
+        """Create training example from a problem"""
+        try:
+            example = {
+                "instruction": "Write a Python function that solves the following problem:",
+                "input": problem.prompt,
+                "output": problem.canonical_solution or "",
+                "entry_point": problem.entry_point,
+                "test": problem.test,
+                "difficulty": problem.difficulty
+            }
+            return example
+        except Exception as e:
+            logger.error(f"Error creating problem example: {e}")
+            return None

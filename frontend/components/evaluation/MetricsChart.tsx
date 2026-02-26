@@ -17,11 +17,31 @@ interface MetricsChartProps {
 }
 
 export const MetricsChart = ({ results }: MetricsChartProps) => {
-  const data = results.map((r) => ({
-    name: r.task_id.slice(0, 10),
-    time: r.time_ms,
-    passed: r.passed ? 1 : 0,
-  }));
+  // Safety check - ensure results is an array
+  if (!results || !Array.isArray(results) || results.length === 0) {
+    return (
+      <div className="h-80 flex items-center justify-center text-gray-500">
+        No data available
+      </div>
+    );
+  }
+
+  // Filter out invalid results and map safely
+  const data = results
+    .filter(r => r && typeof r === 'object') // Ensure each result is an object
+    .map((r) => ({
+      name: r.task_id ? r.task_id.slice(0, 10) : 'Unknown',
+      time: r.time_ms || 0,
+      passed: r.passed ? 1 : 0,
+    }));
+
+  if (data.length === 0) {
+    return (
+      <div className="h-80 flex items-center justify-center text-gray-500">
+        No valid data for chart
+      </div>
+    );
+  }
 
   return (
     <div className="h-80">
