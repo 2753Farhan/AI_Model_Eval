@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Model Evaluation Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            color: #2c3e50;
+            line-height: 1.6;
+        }
+        
+        .navbar {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .navbar h1 {
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        
+        .stat-title {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: #3498db;
+        }
+        
+        .stat-unit {
+            font-size: 1rem;
+            color: #95a5a6;
+            margin-left: 0.5rem;
+        }
+        
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 2rem;
+        }
+        
+        .card h2 {
+            margin-bottom: 1.5rem;
+            color: #34495e;
+            font-weight: 500;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .nav-link {
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 5px;
+            transition: background 0.3s ease;
+        }
+        
+        .nav-link:hover {
+            background: #2980b9;
+        }
+        
+        .activity-list {
+            list-style: none;
+        }
+        
+        .activity-item {
+            padding: 1rem;
+            border-bottom: 1px solid #ecf0f1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-time {
+            color: #95a5a6;
+            font-size: 0.9rem;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #7f8c8d;
+        }
+        
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>🤖 AI Model Evaluation Dashboard</h1>
+    </div>
+    
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-title">Total Evaluations</div>
+                <div class="stat-value" id="eval-count">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Active Models</div>
+                <div class="stat-value" id="model-count">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Total Results</div>
+                <div class="stat-value" id="result-count">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Free Disk Space</div>
+                <div class="stat-value" id="disk-space">-<span class="stat-unit">GB</span></div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Quick Navigation</h2>
+            <div class="nav-links">
+                <a href="/evaluations" class="nav-link">📊 Evaluations</a>
+                <a href="/models" class="nav-link">🤖 Models</a>
+                <a href="/reports" class="nav-link">📈 Reports</a>
+                <a href="/benchmarks" class="nav-link">🎯 Benchmarks</a>
+                <a href="/settings" class="nav-link">⚙️ Settings</a>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Recent Activity</h2>
+            <div id="recent-activity">
+                <div class="loading">Loading recent activity</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>System Status</h2>
+            <div id="system-status">
+                <div class="loading">Checking system status</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Fetch statistics
+        async function fetchStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                
+                document.getElementById('eval-count').textContent = data.evaluations || 0;
+                document.getElementById('model-count').textContent = data.models || 0;
+                document.getElementById('result-count').textContent = data.results || 0;
+                document.getElementById('disk-space').textContent = (data.disk_space || 0).toFixed(1);
+            } catch (error) {
+                console.error('Error fetching stats:', error);
+                document.getElementById('eval-count').textContent = 'Error';
+                document.getElementById('model-count').textContent = 'Error';
+                document.getElementById('result-count').textContent = 'Error';
+                document.getElementById('disk-space').textContent = 'Error';
+            }
+        }
+        
+        // Fetch recent activity
+        async function fetchRecentActivity() {
+            try {
+                const response = await fetch('/api/evaluations');
+                const evaluations = await response.json();
+                
+                const activityDiv = document.getElementById('recent-activity');
+                
+                if (evaluations.length === 0) {
+                    activityDiv.innerHTML = '<p style="color: #7f8c8d; text-align: center;">No recent activity</p>';
+                    return;
+                }
+                
+                const recentEvals = evaluations.slice(-5).reverse();
+                let html = '<ul class="activity-list">';
+                
+                recentEvals.forEach(eval => {
+                    const date = new Date(eval.created_at);
+                    const timeAgo = getTimeAgo(date);
+                    
+                    let statusClass = 'status-success';
+                    if (eval.status === 'failed') statusClass = 'status-error';
+                    if (eval.status === 'running') statusClass = 'status-warning';
+                    
+                    html += `
+                        <li class="activity-item">
+                            <span>
+                                <strong>Evaluation ${eval.evaluation_id.substring(0, 8)}...</strong>
+                                <br>
+                                <small>Models: ${eval.model_ids.join(', ')}</small>
+                            </span>
+                            <span>
+                                <span class="status-badge ${statusClass}">${eval.status}</span>
+                                <span class="activity-time">${timeAgo}</span>
+                            </span>
+                        </li>
+                    `;
+                });
+                
+                html += '</ul>';
+                activityDiv.innerHTML = html;
+            } catch (error) {
+                console.error('Error fetching activity:', error);
+                document.getElementById('recent-activity').innerHTML = 
+                    '<p style="color: #e74c3c; text-align: center;">Error loading activity</p>';
+            }
+        }
+        
+        // Fetch system status
+        async function fetchSystemStatus() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('system-status');
+                const statusClass = data.status === 'healthy' ? 'status-success' : 'status-error';
+                
+                statusDiv.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <span class="status-badge ${statusClass}">${data.status}</span>
+                        <span>Last updated: ${new Date(data.timestamp).toLocaleString()}</span>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error fetching system status:', error);
+                document.getElementById('system-status').innerHTML = 
+                    '<p style="color: #e74c3c;">Error connecting to system</p>';
+            }
+        }
+        
+        // Helper function for time ago
+        function getTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            
+            let interval = seconds / 31536000;
+            if (interval > 1) return Math.floor(interval) + ' years ago';
+            
+            interval = seconds / 2592000;
+            if (interval > 1) return Math.floor(interval) + ' months ago';
+            
+            interval = seconds / 86400;
+            if (interval > 1) return Math.floor(interval) + ' days ago';
+            
+            interval = seconds / 3600;
+            if (interval > 1) return Math.floor(interval) + ' hours ago';
+            
+            interval = seconds / 60;
+            if (interval > 1) return Math.floor(interval) + ' minutes ago';
+            
+            return Math.floor(seconds) + ' seconds ago';
+        }
+        
+        // Load all data
+        fetchStats();
+        fetchRecentActivity();
+        fetchSystemStatus();
+        
+        // Refresh every 30 seconds
+        setInterval(fetchStats, 30000);
+        setInterval(fetchRecentActivity, 30000);
+        setInterval(fetchSystemStatus, 30000);
+    </script>
+</body>
+</html>

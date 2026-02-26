@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Models - AI Model Evaluation Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            color: #2c3e50;
+        }
+        
+        .navbar {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .navbar h1 {
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            margin-left: 2rem;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        
+        .nav-links a:hover {
+            background: #34495e;
+        }
+        
+        .nav-links a.active {
+            background: #3498db;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .page-header h2 {
+            color: #34495e;
+            font-weight: 500;
+        }
+        
+        .refresh-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s;
+        }
+        
+        .refresh-btn:hover {
+            background: #2980b9;
+        }
+        
+        .models-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .model-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: transform 0.3s ease;
+        }
+        
+        .model-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        
+        .model-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .model-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .model-badge {
+            background: #e1f5fe;
+            color: #0288d1;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .model-provider {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        
+        .model-details {
+            margin: 1rem 0;
+            padding: 1rem 0;
+            border-top: 1px solid #ecf0f1;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+        }
+        
+        .detail-label {
+            color: #7f8c8d;
+        }
+        
+        .detail-value {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        
+        .model-status {
+            display: flex;
+            align-items: center;
+            margin: 1rem 0;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .status-active {
+            background: #2ecc71;
+        }
+        
+        .status-inactive {
+            background: #e74c3c;
+        }
+        
+        .test-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            width: 100%;
+            transition: background 0.3s;
+        }
+        
+        .test-btn:hover {
+            background: #2980b9;
+        }
+        
+        .test-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+        
+        .no-models {
+            text-align: center;
+            padding: 3rem;
+            color: #7f8c8d;
+            font-size: 1.1rem;
+            background: white;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>🤖 AI Model Evaluation Dashboard</h1>
+        <div class="nav-links">
+            <a href="/">Dashboard</a>
+            <a href="/evaluations">Evaluations</a>
+            <a href="/models" class="active">Models</a>
+            <a href="/reports">Reports</a>
+            <a href="/settings">Settings</a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="page-header">
+            <h2>Available Models</h2>
+            <button class="refresh-btn" onclick="loadModels()">🔄 Refresh</button>
+        </div>
+        
+        <div id="models-container">
+            <div class="loading">Loading models...</div>
+        </div>
+    </div>
+    
+    <script>
+        async function loadModels() {
+            const container = document.getElementById('models-container');
+            container.innerHTML = '<div class="loading">Loading models...</div>';
+            
+            try {
+                const response = await fetch('/api/models');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const models = await response.json();
+                
+                if (models.length === 0) {
+                    container.innerHTML = '<div class="no-models">No models available. Add models in settings.</div>';
+                    return;
+                }
+                
+                let html = '<div class="models-grid">';
+                
+                models.forEach(model => {
+                    const isActive = model.active || false;
+                    const statusClass = isActive ? 'status-active' : 'status-inactive';
+                    const statusText = isActive ? 'Active' : 'Inactive';
+                    
+                    html += `
+                        <div class="model-card" data-model-id="${model.model_id}">
+                            <div class="model-header">
+                                <span class="model-name">${model.model_id}</span>
+                                <span class="model-badge">${model.provider || 'unknown'}</span>
+                            </div>
+                            <div class="model-provider">Provider: ${model.provider || 'Not specified'}</div>
+                            
+                            <div class="model-details">
+                                <div class="detail-row">
+                                    <span class="detail-label">Max Tokens:</span>
+                                    <span class="detail-value">${model.config?.max_tokens || 'N/A'}</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Temperature:</span>
+                                    <span class="detail-value">${model.config?.temperature || 'N/A'}</span>
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Status:</span>
+                                    <span class="detail-value">
+                                        <div class="model-status">
+                                            <span class="status-indicator ${statusClass}"></span>
+                                            ${statusText}
+                                        </div>
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <button class="test-btn" onclick="testModel('${model.model_id}')">
+                                Test Connection
+                            </button>
+                            <div id="test-result-${model.model_id}" style="margin-top: 0.5rem; font-size: 0.9rem;"></div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                container.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error loading models:', error);
+                container.innerHTML = `<div class="error-message">Error loading models: ${error.message}</div>`;
+            }
+        }
+        
+        async function testModel(modelId) {
+            const resultDiv = document.getElementById(`test-result-${modelId}`);
+            const button = event.target;
+            
+            button.disabled = true;
+            resultDiv.innerHTML = 'Testing connection...';
+            resultDiv.style.color = '#7f8c8d';
+            
+            try {
+                const response = await fetch(`/api/models/${modelId}/test`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.connected) {
+                    resultDiv.innerHTML = '✅ Connection successful!';
+                    resultDiv.style.color = '#27ae60';
+                } else {
+                    resultDiv.innerHTML = '❌ Connection failed';
+                    resultDiv.style.color = '#e74c3c';
+                }
+            } catch (error) {
+                console.error('Error testing model:', error);
+                resultDiv.innerHTML = `❌ Error: ${error.message}`;
+                resultDiv.style.color = '#e74c3c';
+            } finally {
+                button.disabled = false;
+            }
+        }
+        
+        // Load models on page load
+        document.addEventListener('DOMContentLoaded', loadModels);
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadModels, 30000);
+    </script>
+</body>
+</html>
